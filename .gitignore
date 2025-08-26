@@ -1,0 +1,39 @@
+# Python
+*.pyc
+__pycache__/
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.egg-info/
+
+# Environment
+.env
+.env.*
+
+# Alembic
+alembic/versions/*.pyc
+
+# Node
+node_modules/
+
+# Frontend build
+/dist/
+/build/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
+
+# Logs
+*.log
+
+# Others
+*.bak
+*.swp
+
+# Ignore local data
+backend/data/
