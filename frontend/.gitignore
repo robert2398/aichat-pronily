@@ -1,0 +1,47 @@
+# Node modules
+node_modules/
+
+# Vite cache and build output
+.vite/
+dist/
+build/
+
+# Tailwind / PostCSS cache
+.cache/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Editor directories and files
+.vscode/
+.idea/
+*.sublime-workspace
+*.code-workspace
+
+# macOS / Windows
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+
+# Coverage
+coverage/
+
+# ESLint cache
+.eslintcache
+
+# Misc
+*.swp
+*.swo
+*.tmp

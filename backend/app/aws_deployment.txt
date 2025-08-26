@@ -1,0 +1,72 @@
+https://www.figma.com/proto/XUO9BgbO7g7waRxPIQt6Wu/Pronily-web?page-id=0%3A1&node-id=92-1014&viewport=-265%2C-189%2C0.24&t=XOMxW19ekNMGbda5-1&scaling=scale-down-width&content-scaling=fixed&hide-ui=1
+
+
+###########
+Password : P@ssw0rd@Ch@tA!
+
+INSERT INTO public.users
+    (email,
+     hashed_password,
+     role,
+     is_active,
+     is_email_verified,
+     created_at,
+     updated_at)
+VALUES
+    ('admin@tripleminds.com',
+     '$2b$12$pg8JcLAhwqJQFAFvxHKWtu.GemTRx3p4fJ6Tomdb3Ox/ys4Ym.xhG', -- bcrypt hash
+     'ADMIN',        -- must match the RoleEnum value exactly
+     TRUE,           -- is_active
+     TRUE,           -- is_email_verified
+     NOW(),          -- created_at
+     NOW());
+
+
+############################3
+
+
+INSERT INTO app_config (category, parameter_name, parameter_value, parameter_description, created_at, updated_at) VALUES
+('General', 'FRONTEND_URL', 'http://localhost:5173', 'Base URL of the frontend application.', NOW(), NOW()),
+('General', 'BACKEND_URL', 'http://127.0.0.1:8000', 'Base URL of the FastAPI backend server.', NOW(), NOW());
+
+INSERT INTO app_config (category, parameter_name, parameter_value, parameter_description, created_at, updated_at) VALUES
+('ChatAPI', 'CHAT_GEN_URL', 'https://api.lightspeedcloud.ai/api/v1/ollama/chat', 'Max wait time in seconds for chat response.', NOW(), NOW()),
+('ChatAPI', 'CHAT_GEN_MODEL', 'llama3', 'Max wait time in seconds for chat response.', NOW(), NOW()),
+('ChatAPI', 'CHAT_GEN_USERNAME', 'support@deepnudify.com', 'Sleep interval in seconds for polling chat status.', NOW(), NOW());
+
+INSERT INTO app_config (category, parameter_name, parameter_value, parameter_description, created_at, updated_at) VALUES
+('ImageAPI', 'IMAGE_GEN_URL', 'https://api.lightspeedcloud.ai/api/v1/image/clone', 'Endpoint ID used for image generation model.', NOW(), NOW()),
+('ImageAPI', 'IMAGE_GEN_MODEL', 'fluxnsfw', 'Number of inference steps for image generation.', NOW(), NOW()),
+('ImageAPI', 'IMAGE_GEN_WEIGHT', '0.5', 'Guidance scale controls image creativity vs adherence to prompt.', NOW(), NOW()),
+('ImageAPI', 'IMAGE_GEN_STEPS', '35', 'Width of the generated image in pixels.', NOW(), NOW()),
+('ImageAPI', 'IMAGE_GEN_CFG_SCALE', '12', 'Height of the generated image in pixels.', NOW(), NOW()),
+('ImageAPI', 'IMAGE_GEN_USERNAME', 'support@deepnudify.com', 'Max wait time in seconds for image generation task.', NOW(), NOW()),
+('ImageAPI', 'PROMPT_ENHANCE_URL', 'https://api.lightspeedcloud.ai/api/v1/prompt/generate', 'Max wait time in seconds for image generation task.', NOW(), NOW()),
+('ImageAPI', 'IMAGE_NEGATIVE_PROMPT', '--no blur,--no watermark,--no extra limbs,--no distortion.', 'Negative prompt to be applied by model.', NOW(), NOW()),
+('ImageAPI', 'IMAGE_POSITIVE_PROMPT', 'High Quality 8k.', 'Positive prompt to be applied by model.', NOW(), NOW());
+
+INSERT INTO app_config (category, parameter_name, parameter_value, parameter_description, created_at, updated_at) VALUES
+('VideoAPI', 'VIDEO_GEN_URL', 'https://api.lightspeedcloud.ai/api/v1/video/clone', 'Endpoint ID used for image generation model.', NOW(), NOW()),
+('VideoAPI', 'VIDEO_GEN_MODEL', 'wan2.2', 'Number of inference steps for image generation.', NOW(), NOW()),
+('VideoAPI', 'VIDEO_GEN_USERNAME', 'support@deepnudify.com', 'Number of inference steps for image generation.', NOW(), NOW()),
+('VideoAPI', 'VIDEO_GEN_PROMPT_ENHANCE', 'https://api.lightspeedcloud.ai/api/v1/prompt/generate/video', 'Number of inference steps for image generation.', NOW(), NOW());
+
+
+INSERT INTO app_config (category, parameter_name, parameter_value, parameter_description, created_at, updated_at) VALUES
+('General', 'AWS_REGION', 'eu-north-1', 'AWS region used for S3 and other services.', NOW(), NOW()),
+('General', 'AWS_BUCKET_NAME', 'aichat-pronily', 'Name of the S3 bucket used for storing media or assets.', NOW(), NOW());
+
+INSERT INTO app_config (category, parameter_name, parameter_value, parameter_description, created_at, updated_at) VALUES
+('Stripe', 'STRIPE_ANNUAL_PRO_PRICE_ID', 'price_1RnDyQFZp40kitrQWiXjPpdA', 'Stripe price ID for Pro annual subscription.', NOW(), NOW()),
+('Stripe', 'STRIPE_ANNUAL_VIP_PRICE_ID', 'price_1RnDzwFZp40kitrQYvcwcraE', 'Stripe price ID for VIP annual subscription.', NOW(), NOW()),
+('Stripe', 'STRIPE_MONTHLY_PRO_PRICE_ID', 'price_1RnDyQFZp40kitrQWiXjPpdA', 'Stripe price ID for Pro monthly subscription.', NOW(), NOW()),
+('Stripe', 'STRIPE_MONTHLY_VIP_PRICE_ID', 'price_1RnDzwFZp40kitrQYvcwcraE', 'Stripe price ID for VIP monthly subscription.', NOW(), NOW());
+
+
+#################
+ALTER TABLE characters
+ADD COLUMN username VARCHAR NOT NULL,
+ADD COLUMN bio TEXT;
+
+ALTER TABLE characters
+DROP COLUMN user_query_instructions;

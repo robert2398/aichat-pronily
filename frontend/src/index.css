@@ -1,0 +1,15 @@
+/* src/index.css
+   Tailwind entry file. Vite/main.jsx imports "./src/index.css" so we need this file.
+   It also imports the project's existing styles.css for any custom rules.
+*/
+@import "tailwindcss/preflight";
+@import "tailwindcss/utilities";
+
+/* Import the project's global stylesheet (located at project root: styles.css) */
+@import "../styles.css";
+
+/* Hide footer when chat is open (set by AiChat effect) */
+body[data-chat-open="1"] footer,
+body[data-chat-open="1"] .site-footer {
+  display: none !important;
+}
