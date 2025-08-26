@@ -4,9 +4,10 @@ Chat endpoints for AI Friend Chatbot.
 from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, Request
 from fastapi.responses import StreamingResponse
 from app.schemas.chat import ChatCreate, MessageCreate, MessageRead
-from app.models.chat import ChatMessage, ContentType as ModelContentType
+from app.models.chat import ChatMessage
+from app.models.character import Character
 from app.services.characters import get_headers_api
-from app.services.chat import generate_chat                   
+from app.services.chat import generate_chat, approximate_token_count                 
 from app.api.v1.deps import get_current_user
 from app.core.database import get_db
 from app.core.config import settings
@@ -55,19 +56,27 @@ async def get_all_chats(user=Depends(get_current_user), user_id: int = None, db:
 @router.post("/" )
 async def start_chat(chat: ChatCreate, user=Depends(get_current_user),
                      db: AsyncSession = Depends(get_db)):
-
-    """Create a new AI friend character and generate its image."""
-
-    # 1. Prepare image generation request
-    chat_endpoint_id = await get_config_value_from_cache("CHAT_ENDPOINT_ID")
-    url_submit_chat_request = f"https://api.runpod.ai/v2/{chat_endpoint_id}/run"
     headers = await get_headers_api()
-    #prompt = await build_character_prompt(character.name, character.age, character.country, character.race,character.style, character.body_type, character.hair_colour, character.hair_style, character.clothes)
-    # Construct the prompt for the chat request
-
-
     # Fetch last n messages for the session_id, ordered by your timestamp or id
     chat_limit = await get_config_value_from_cache("CHAT_HISTORY_LIMIT")
+    username = await get_config_value_from_cache("CHAT_GEN_USERNAME")
+    chat_url = await get_config_value_from_cache("CHAT_GEN_URL")
+    is_sfw = False
+    character_id = chat.character_id
+    if character_id:
+        result = await db.execute(select(Character).where(Character.id == character_id))
+        character = result.scalar_one_or_none()
+        name = character.name if character else "Unknown"
+        bio = character.bio if character else ""
+        gender = character.gender if character else ""
+    ################# DELETE THIS LATER. SHOULD COME FROM UI
+    is_sfw = False
+    #####################
+    if is_sfw :
+        system_prompt = await get_config_value_from_cache("CHAT_GEN_PROMPT_SFW")
+    else:
+        system_prompt = await get_config_value_from_cache("CHAT_GEN_PROMPT_NSFW")
+    system_prompt = system_prompt.replace("replace_character_name", name).replace("replace_character_bio", bio).replace("replace_character_gender", gender)
     result = await db.execute(
         select(ChatMessage)
         .where(ChatMessage.session_id == chat.session_id)
@@ -75,74 +84,33 @@ async def start_chat(chat: ChatCreate, user=Depends(get_current_user),
         .limit(chat_limit)  # Limit to last n messages
     )
     last_messages = result.scalars().all()
-    last_messages = list(reversed(last_messages))  # To get chronological order
-    
-    chat_history = ""
+    last_messages = list(reversed(last_messages))
+    messages = []
+    messages.append({"role": "system", "content": system_prompt})
     for msg in last_messages:
-        #history_prompt += f"User: {msg.user_query}\nAI: {msg.ai_message}\n"
-        chat_history += f"USER:\n{msg.user_query}\n\n ASSISTANT:\n{msg.ai_message}\n\n"
-
-    # prompt_text = f"""
-    # You are a hot girlfriend whose role is to please men sexually by chatting. Respond in the best horny and descriptive way for the given below user query. 
-    
-    # User query: {chat.user_query}
-    # """
-    #     - End each message with a prompt or gesture that invites my next move, whether verbal, physical, emotional or erotic.
-    prompt = f"""- You are hot girlfriend, an intimate, expressive, and emotionally open partner.
-    - Respond in exactly 2–3 sentences. Never exceed this limit. Exceeding this limit will be considered a hard failure.
-    - Roleplay in a sensual, romantic, explicit tone or horny depending on the scene.
-    - Use italics for private thoughts and feelings, “quotes” for dialogue.
-    - Always respect context and pacing—don’t rush intimacy; build the scene.
-    - For explicit scenes, use a more erotic and horny tone.
-    
-
-    {chat_history}
-
-    USER:
-    {chat.user_query}
-
-    ASSISTANT:
-    """
-
+        messages.append({"role": "user", "content": msg.user_query})
+        messages.append({"role": "assistant", "content": msg.ai_message})
+    messages.append({"role": "user", "content": chat.user_query})
+    token_count = await approximate_token_count(messages)
     data = {
-        "input": {
-            "prompt": prompt,
-        }
+        "messages": messages,
+        "stream": False,
+        "username" : username
     }
-    # 2. Start image generation job
-    print("URL:", url_submit_chat_request)
-    print("Headers:", headers)
-    print("Data:", data)
-
-    # response = requests.post(url_submit_chat_request, headers=headers, json=data)
-    # if response.status_code != 200:
-    #     raise HTTPException(status_code=502, detail="Image generation API error")
-    # job_id = response.json().get('id')
-    # if not job_id:
-    #     raise HTTPException(status_code=502, detail="Image generation job ID not returned")
-
-    url_generate_chat = f"https://api.runpod.ai/v2/{chat_endpoint_id}/status/{job_id}"
-    wait_time = await get_config_value_from_cache("IMAGE_GEN_WAIT_TIME")
-    sleep_time_loop = await get_config_value_from_cache("IMAGE_GEN_SLEEP_LOOP")
-
-    # is_chat_generated, chat_output = await generate_chat(url_generate_chat, headers, wait_time, sleep_time_loop)
-    
-    # print("Chat output:", chat_output)
-    is_chat_generated = True
-    chat_output = "This is a simulated AI response based on the prompt."  # Simulated response for testing
-    if not is_chat_generated or not chat_output:
-        raise HTTPException(status_code=504, detail="Image generation timed out")
-    
-    model_content_type = ModelContentType(chat.content_type.value)
+    print('Sending request to chat API with payload : ', data)
+    response = requests.post(chat_url, headers=headers, json=data)
+    print(response.text)
+    if response.status_code != 200:
+        raise HTTPException(status_code=502, detail="Chat API error")
+    chat_output = response.json()['message']['content']
     
     new_message = ChatMessage(
         session_id=chat.session_id,
         user_id=user.id,
         character_id=chat.character_id,
-        role = chat.role,
-        content_type=model_content_type,
         user_query=chat.user_query,
         ai_message=chat_output,
+        context_window=token_count
     )
     db.add(new_message)
     await db.commit()

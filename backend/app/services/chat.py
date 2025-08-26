@@ -2,7 +2,7 @@
 import httpx
 import asyncio
 from app.services.app_config import get_config_value_from_cache
-
+import tiktoken
 async def generate_chat(url_generate_chat, headers, wait_time, sleep_time_loop):
     """
     Asynchronously polls a chat generation endpoint until completion or timeout.
@@ -38,3 +38,17 @@ async def generate_chat(url_generate_chat, headers, wait_time, sleep_time_loop):
                 break
             await asyncio.sleep(sleep_time_loop)
     return is_chat_generated, response_output
+
+
+
+async def approximate_token_count(messages: list) -> int:
+    """
+    Approximate token count for a list of messages (dicts with 'role' and 'content').
+    Uses cl100k_base encoding (default for GPT-3.5/4).
+    """
+    encoding = tiktoken.get_encoding("cl100k_base")
+    total_tokens = 0
+    for msg in messages:
+        total_tokens += len(encoding.encode(msg["content"]))
+    
+    return total_tokens

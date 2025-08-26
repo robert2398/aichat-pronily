@@ -25,10 +25,10 @@ class CharacterBase(BaseModel):
     relationship_type: Optional[str]
     clothing: Optional[str]
     special_features: Optional[str]
-    enhanced_prompt: Optional[bool]
+    
 
 class CharacterCreate(CharacterBase):
-    pass
+    enhanced_prompt: Optional[bool]
 
 class CharacterRead(CharacterBase):
     id: int

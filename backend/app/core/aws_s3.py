@@ -39,7 +39,7 @@ async def get_s3_client():
 #     return presigned_url
 
 
-async def generate_presigned_url(s3_key: str, expires_in: int = 3600) -> str:
+async def generate_presigned_url(s3_key: str, expires_in: int = 36000) -> str:
     """
     Generate a pre-signed URL for accessing an S3 object.
     """

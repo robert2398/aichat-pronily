@@ -30,8 +30,8 @@ async def build_character_prompt(
     relationship_type: Optional[str] = "Friend",
     clothing: Optional[str] = "Hoodie",
     special_features: Optional[str] = "Tattoos",
-    setting: Optional[str] = None,
-    include_negative: bool = True,
+    positive_prompt: Optional[str] = "--Ultra-detailed, 8K resolution, cinematic lighting",
+    negative_prompt: Optional[str] = "--no blur,--no watermark,--no extra limbs,--no distortion."
 ) -> str:
     """
     Generate a high-quality character prompt for Flux-style image generation.
@@ -81,17 +81,13 @@ async def build_character_prompt(
     if bio:
         parts.append(f"— {bio}")
 
-    # Setting
-    if setting:
-        parts.append(f"Set in {setting}")
-
     # Join prompt
     prompt = ", ".join(parts)
-    prompt += ". Ultra-detailed, 8K resolution, cinematic lighting, photorealistic textures"
-
+    if positive_prompt:
+        prompt += f" --{positive_prompt}"
     # Negative prompts
-    if include_negative:
-        prompt += " --no blur, --no watermark, --no extra limbs, --no distortion."
+    if negative_prompt:
+        prompt += f" --{negative_prompt}"
 
     return prompt
 
@@ -120,6 +116,7 @@ async def generate_image_request(prompt, num_images,initial_image,size_orientati
     username = await get_config_value_from_cache("IMAGE_GEN_USERNAME")
 
     headers = await get_headers_api()
+    print('Headers:', headers)
     data = {"query" : prompt,
             "num_images" : num_images,
             "ai_model" : ai_model,
@@ -132,7 +129,9 @@ async def generate_image_request(prompt, num_images,initial_image,size_orientati
             "cfg_scale" : cfg_scale,
             "username" : username 
             }
+    print('Image Generation Payload:', data)
     response = requests.post(apiurl, headers = headers, json=data)
+    print('Image Generation Response:', response.text, response.status_code)
     return response
 
 def save_image_to_local_storage(image_data_str, filepath):

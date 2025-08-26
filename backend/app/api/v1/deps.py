@@ -43,6 +43,8 @@ async def get_headers_api() -> dict[str, str]:
     dict[str, str]
         Headers including authorization token.
     """
-    headers =  {"API-Key": f"Bearer {settings.API_TOKEN}",
-        "Content-Type": "application/json"}
+    headers =  {
+    "Content-Type": "application/json",
+    "API-Key": settings.API_TOKEN
+    }
     return headers

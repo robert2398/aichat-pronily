@@ -34,7 +34,8 @@ async def create_character(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new AI friend character and generate its image."""
-    
+    positive_prompt = await get_config_value_from_cache("IMAGE_POSITIVE_PROMPT")
+    negative_prompt = await get_config_value_from_cache("IMAGE_NEGATIVE_PROMPT")
     prompt = await build_character_prompt(
                     name=character.name,
                     bio=character.bio,
@@ -53,30 +54,34 @@ async def create_character(
                     voice_type=character.voice_type,
                     relationship_type=character.relationship_type,
                     clothing=character.clothing,
-                    special_features=character.special_features)
+                    special_features=character.special_features,
+                    positive_prompt=positive_prompt,
+                    negative_prompt=negative_prompt
+                )
     print('Prompt Generated:', prompt)
     if character.enhanced_prompt:
         prompt = await enhance_prompt(prompt)
     
-    # response = await generate_image_request(prompt, num_images = 1, initial_image = None, size_orientation = "portrait")
-    # if response.status_code == 200:
-    #     json_resp = response.json()
-    #     image_data = json_resp["data"]["images_data"]
-    #     base64_data = image_data[0]
-    #     image_data_bs4 = base64.b64decode(base64_data)
-    #     image = BytesIO(image_data_bs4)
+    response = await generate_image_request(prompt, num_images = 1, initial_image = None, size_orientation = "portrait")
+    print('Image Generation Response:', response.text)
+    if response.status_code == 200:
+        json_resp = response.json()
+        image_data = json_resp["data"]["images_data"]
+        base64_data = image_data[0]
+        image_data_bs4 = base64.b64decode(base64_data)
+        image_file = BytesIO(image_data_bs4)
 
-    #     is_image_generated = True
+        is_image_generated = True
 
-    # if not is_image_generated:
-    #     raise HTTPException(status_code=504, detail="Image generation timed out")
+    if not is_image_generated:
+        raise HTTPException(status_code=504, detail="Image generation timed out")
 
     # ##########
-    tmp_filepath = r"./data/character-images/base64_out1.txt"
-    with open(tmp_filepath, "r") as image_file:
-        base64_image = image_file.read().strip()
-        image_data = base64.b64decode(base64_image)
-        image_file = BytesIO(image_data)
+    # tmp_filepath = r"./data/character-images/base64_out1.txt"
+    # with open(tmp_filepath, "r") as image_file:
+    #     base64_image = image_file.read().strip()
+    #     image_data = base64.b64decode(base64_image)
+    #     image_file = BytesIO(image_data)
     # #######################
 
     file_extension = "png"
@@ -125,8 +130,6 @@ async def create_character(
     return JSONResponse(content={"message": "Character created successfully",
                                      "image_path" : presigned_s3_url}, status_code=200)
     
-    # return JSONResponse(content={"message": "Character created successfully",
-    #                                  "image_path" : prompt}, status_code=200)
 
 @router.post("/edit-by-id/{character_id}")
 async def edit_character(
@@ -238,10 +241,18 @@ async def list_characters(
         .where(Character.user_id == user.id)
     )
     characters = result.scalars().all()
-    return characters
+    updated_characters = []
+    for character in characters:
+        char_dict = CharacterRead.model_validate(character).model_dump()
+        s3_value = char_dict.get("image_url_s3")
+        if s3_value:
+            presigned = await generate_presigned_url(s3_key=s3_value)
+            char_dict["image_url_s3"] = presigned
+        updated_characters.append(CharacterRead(**char_dict))
+    return updated_characters
 
 
-@router.get("/fetch-non-logged-user", response_model=List[CharacterRead])
+@router.get("/fetch-default", response_model=List[CharacterRead])
 async def list_characters(
     db: AsyncSession = Depends(get_db)
 ):
@@ -256,7 +267,16 @@ async def list_characters(
         .where(Character.user_id.in_(admin_user_ids))
     )
     characters = result.scalars().all()
-    return characters
+    # Replace image_url_s3 with presigned URL
+    updated_characters = []
+    for character in characters:
+        char_dict = CharacterRead.model_validate(character).model_dump()
+        s3_value = char_dict.get("image_url_s3")
+        if s3_value:
+            presigned = await generate_presigned_url(s3_key=s3_value)
+            char_dict["image_url_s3"] = presigned
+        updated_characters.append(CharacterRead(**char_dict))
+    return updated_characters
 
 @router.get("/fetch-by-id/{character_id}")
 async def get_character(
