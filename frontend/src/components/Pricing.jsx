@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useMemo, useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Check, X } from "lucide-react";
 
 function SegmentedBilling({ value, onChange }) {
@@ -116,78 +116,61 @@ function PlanCard({
 
 export default function Pricing() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [billing, setBilling] = useState("monthly"); // 'monthly' | 'annual'
+  const [plans, setPlans] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const plans = useMemo(() => {
-    const per = billing === "annual" ? "/yr" : "/mo";
-    // You can customize annual prices if you want deeper discounts;
-    // here we just multiply for the "total" copy and keep per-unit the same.
-    return [
-      {
-        key: "premium-left",
-        title: "Premium",
-        priceCurrent: "6.99",
-        priceOld: "9.99",
-        per,
-        blurb:
-          billing === "annual"
-            ? "For a total 83.88"
-            : "For a total 83.88",
-        highlight: false,
-        features: [
-          { ok: true,  text: "6000 credits per month" },
-          { ok: true,  text: "4k memory for smooth chat experience" },
-          { ok: true,  text: "Character image generation" },
-          { ok: true,  text: "20 credits for each AI-assisted conversation" },
-          { ok: false, text: "Deluxe voice chat response" },
-          { ok: false, text: "Picture generation from chat context" },
-        ],
-      },
-      {
-        key: "deluxe",
-        title: "Deluxe",
-        priceCurrent: "12.99",
-        priceOld: "19.99",
-        per,
-        blurb:
-          billing === "annual"
-            ? "For a total 155.88"
-            : "For a total 155.88",
-        highlight: true,
-        features: [
-          { ok: true, text: "No need for credits" },
-          { ok: true, text: "16k memory for immersive chat experience" },
-          { ok: true, text: "Character image generation" },
-          { ok: true, text: "Unlimited AI-assisted conversations" },
-          { ok: true, text: "Deluxe voice chat response" },
-          { ok: true, text: "Picture generation from chat context" },
-        ],
-      },
-      {
-        key: "premium-right",
-        title: "Premium",
-        priceCurrent: "6.99",
-        priceOld: "9.99",
-        per,
-        blurb:
-          billing === "annual"
-            ? "For a total 83.88"
-            : "For a total 83.88",
-        highlight: false,
-        features: [
-          { ok: true,  text: "6000 credits per month" },
-          { ok: true,  text: "4k memory for smooth chat experience" },
-          { ok: true,  text: "Character image generation" },
-          { ok: true,  text: "20 credits for each AI-assisted conversation" },
-          { ok: false, text: "Deluxe voice chat response" },
-          { ok: false, text: "Picture generation from chat context" },
-        ],
-      },
-    ];
-  }, [billing]);
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setError(null);
+    const base = import.meta.env.VITE_API_BASE_URL || "";
+    const url = (base.endsWith("/") ? base.slice(0, -1) : base) + "/subscription/get-pricing";
+    fetch(url)
+      .then(async (r) => {
+        if (!r.ok) {
+          const txt = await r.text().catch(() => "");
+          throw new Error(`HTTP ${r.status} ${r.statusText} - ${txt.slice(0, 200)}`);
+        }
+        // attempt JSON parse, but provide helpful error if HTML is returned
+        const txt = await r.text();
+        try {
+          return JSON.parse(txt);
+        } catch (err) {
+          throw new Error(`Invalid JSON response from ${url}: ${txt.slice(0, 200)}`);
+        }
+      })
+      .then((data) => {
+        if (!mounted) return;
+        // keep only active
+        const active = (data || []).filter((p) => p.status === "Active");
+        setPlans(active);
+      })
+      .catch((err) => {
+        console.error("Failed to load pricing", err);
+        if (mounted) setError(err.message || "Failed to load");
+      })
+      .finally(() => mounted && setLoading(false));
+    return () => (mounted = false);
+  }, []);
 
-  const goCheckout = (planKey) => {
-    navigate(`/checkout?plan=${planKey}&billing=${billing}`);
+  const goCheckout = (pricing) => {
+    // pricing: a pricing object from the API
+    if (!pricing || !pricing.pricing_id) {
+      console.warn("Missing pricing selected");
+      return;
+    }
+    // require user to be signed in
+    const stored = localStorage.getItem("pronily:auth:token");
+    if (!stored) {
+      // redirect to signin and preserve current location as background so modal returns here
+      navigate('/signin', { state: { background: location } });
+      return;
+    }
+    // route to verify page where user can pick promo and confirm
+    navigate(`/verify?pricing_id=${encodeURIComponent(pricing.pricing_id)}`);
   };
 
   return (
@@ -201,25 +184,53 @@ export default function Pricing() {
 
       <section className="rounded-3xl border border-white/10 bg-white/[.03] p-5 sm:p-8 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((p) => (
-            <div
-              key={p.key}
-              className={`transition-transform ${p.highlight ? "md:scale-105" : ""}`}
-            >
-              <PlanCard
-                title={p.title}
-                highlight={p.highlight}
-                priceCurrent={p.priceCurrent}
-                priceOld={p.priceOld}
-                per={p.per}
-                blurb={p.blurb}
-                features={p.features}
-                onPay={() => goCheckout(p.key)}
-              />
-            </div>
-          ))}
-        </div>
+          {loading ? (
+            <div className="col-span-3 text-center py-8">Loading plans…</div>
+          ) : error ? (
+            <div className="col-span-3 text-center py-8 text-red-400">{error}</div>
+          ) : (
+            // dedupe by pricing_id, filter strictly by billing_cycle, and sort by price
+            (() => {
+              const norm = (s = "") => String(s).toLowerCase();
+              const isAnnualSelected = billing === "annual";
+
+              // filter strictly by billing_cycle and sort by price
+              const filtered = (plans || []).filter((pl) => {
+                const c = norm(pl.billing_cycle || "");
+                if (isAnnualSelected) return c.includes("year") || c.includes("annual") || c.includes("yearly");
+                return c.includes("month");
+              });
+
+              filtered.sort((a, b) => (Number(a.price || 0) - Number(b.price || 0)));
+
+              return filtered.map((p) => {
+                const priceCurrent = (p.price || 0).toFixed(2);
+                const priceOld = p.discount ? (p.price / (1 - p.discount / 100)).toFixed(2) : null;
+                const per = isAnnualSelected ? "/yr" : "/mo";
+                const features = [
+                  { ok: true, text: `${p.coin_reward} coins per ${p.billing_cycle.toLowerCase()}` },
+                  { ok: true, text: `${p.plan_name} tier` },
+                ];
+
+                return (
+                  <div key={p.pricing_id} className={`transition-transform`}>
+                    <PlanCard
+                      title={p.plan_name}
+                      highlight={false}
+                      priceCurrent={priceCurrent}
+                      priceOld={priceOld}
+                      per={per}
+                      blurb={`${p.coin_reward} coins - ${p.billing_cycle}`}
+                      features={features}
+                      onPay={() => goCheckout(p)}
+                    />
+                  </div>
+                );
+              });
+            })()
+          )}
+    </div>
       </section>
-    </main>
+  </main>
   );
 }

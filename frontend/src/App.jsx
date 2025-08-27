@@ -8,6 +8,10 @@ import FeaturesGrid from "./components/FeaturesGrid";
 import FeatureShowcase from "./components/FeatureShowcase";
 import PricingPlans from "./components/PricingPlans";
 import Pricing from "./components/Pricing";
+import Verify from "./components/Verify";
+import VerifyConfirm from "./components/VerifyConfirm";
+import Success from "./components/Success";
+import Cancel from "./components/Cancel";
 import StoryGenerator from "./components/StoryGenerator";
 import GameGenerator from "./components/GameGenerator";
 import FaqSection from "./components/FaqSection";
@@ -203,6 +207,38 @@ export default function App() {
           element={
             <main className="mx-auto max-w-7xl px-4 py-12">
               <Pricing />
+            </main>
+          }
+        />
+        <Route
+          path="/verify"
+          element={
+            <main className="mx-auto max-w-7xl px-4 py-12">
+              <Verify />
+            </main>
+          }
+        />
+        <Route
+          path="/verify/confirm"
+          element={
+            <main className="mx-auto max-w-7xl px-4 py-12">
+              <VerifyConfirm />
+            </main>
+          }
+        />
+        <Route
+          path="/success"
+          element={
+            <main className="mx-auto max-w-7xl px-4 py-12">
+              <Success />
+            </main>
+          }
+        />
+        <Route
+          path="/cancel"
+          element={
+            <main className="mx-auto max-w-7xl px-4 py-12">
+              <Cancel />
             </main>
           }
         />

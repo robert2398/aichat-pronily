@@ -1,5 +1,5 @@
 """
-Stripe webhook endpoint for subscription events.
+Stripe webhook endpoint for subscription events with coupon management.
 """
 
 import asyncio
@@ -12,15 +12,17 @@ from sqlalchemy.future import select
 from app.core.database import get_db
 from app.models.user import User
 from app.models.subscription import Subscription, PricingPlan, CoinTransaction, UserWallet
+from app.models.subscription import PromoManagement, PromoRedemption
 from app.api.v1.deps import get_current_user
-from datetime import datetime
+from datetime import datetime, timezone
 from app.core.config import settings
-from app.services.app_config import get_config_value_from_cache, get_price_id
+from app.services.app_config import get_config_value_from_cache
 
 router = APIRouter()
 
 stripe.api_key = settings.STRIPE_API_KEY
 STRIPE_WEBHOOK_SECRET = settings.STRIPE_WEBHOOK_SECRET
+
 
 @router.post("/create-checkout-session", response_model=CheckoutSessionResponse)
 async def create_checkout_session(
@@ -28,10 +30,6 @@ async def create_checkout_session(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    # Find or create user by email
-    # result = await db.execute(select(User).where(User.email == payload.email))
-    # user = result.scalar_one_or_none()
-    
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -39,26 +37,51 @@ async def create_checkout_session(
     if not user.payment_customer_id:
         customer = stripe.Customer.create(email=user.email)
         user.payment_customer_id = customer.id
-        print('Created new Stripe customer with ID:', customer.id)
         await db.commit()
         await db.refresh(user)
     else:
         customer = stripe.Customer.retrieve(user.payment_customer_id)
-        print('Using existing Stripe customer with ID:', customer.id)
-    price_id = await get_price_id(payload)
+
     frontend_url = await get_config_value_from_cache("FRONTEND_URL")
-    if not price_id:
+    if not payload.price_id:
         raise HTTPException(status_code=400, detail="Invalid plan name")
+
+    promo_code = None
+    if payload.coupon:
+        # Check promo validity
+        res = await db.execute(select(PromoManagement).where(PromoManagement.coupon == payload.coupon))
+        promo = res.scalars().first()
+        if not promo:
+            raise HTTPException(status_code=400, detail="Invalid coupon")
+        if promo.status != "active":
+            raise HTTPException(status_code=400, detail="Coupon inactive")
+        if promo.expiry_date and datetime.now(timezone.utc) > promo.expiry_date:
+            raise HTTPException(status_code=400, detail="Coupon expired")
+
+        promo_code = promo.stripe_promotion_id  # Stripe promo_id eg promo_******
+        # Pre-create redemption entry (pending)
+        redemption = PromoRedemption(
+            promo_id=promo.promo_id,
+            promo_code=payload.coupon,
+            user_id=user.id,
+            discount_applied=payload.discount_applied,
+            subtotal_at_apply=payload.subtotal_at_apply,
+            status="pending"
+        )
+        db.add(redemption)
+        await db.commit()
 
     session = stripe.checkout.Session.create(
         customer=customer.id,
         payment_method_types=["card"],
-        line_items=[{"price": price_id, "quantity": 1}],
+        line_items=[{"price": payload.price_id, "quantity": 1}],
         mode="subscription",
-        success_url = frontend_url + "/success?session_id={CHECKOUT_SESSION_ID}",
-        cancel_url = frontend_url + "/cancel",
+        discounts=[{"promotion_code": promo_code}] if promo_code else None,
+        success_url=frontend_url + "/success?session_id={CHECKOUT_SESSION_ID}",
+        cancel_url=frontend_url + "/cancel",
     )
     return CheckoutSessionResponse(session_id=session.id)
+
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
@@ -79,6 +102,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         )
         return res.scalars().first()
 
+    # ✅ Subscription created
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
         customer_id = session["customer"]
@@ -111,7 +135,6 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                 plan_name=plan_name,
                 status="active",
                 current_period_end=current_period_end,
-                # new tracking fields
                 last_rewarded_period_end=current_period_end,
                 total_coins_rewarded=0,
             )
@@ -119,24 +142,23 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             await db.commit()
             await db.refresh(sub)
 
-            # Reward full coins for this subscription
-            coins = 0
+            # Reward coins
             pricing = await get_pricing(price_id)
-            if pricing:
-                coins = int(pricing.coin_reward or 0)
+            coins = int(pricing.coin_reward or 0) if pricing else 0
 
             tx = CoinTransaction(
                 user_id=user.id,
                 coins=coins,
                 source_type="subscription",
                 source_id=sub.id,
-                subscription_id=sub.id,  # new field
+                subscription_id=sub.id,
                 description="Subscription Initial Reward",
                 period_start=current_period_start,
                 period_end=current_period_end,
             )
             db.add(tx)
 
+            # Update wallet
             wallet_res = await db.execute(select(UserWallet).where(UserWallet.user_id == user.id))
             wallet = wallet_res.scalars().first()
             if wallet:
@@ -146,8 +168,30 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                 db.add(wallet)
 
             sub.total_coins_rewarded += coins
+
+            # ✅ Mark promo redemption success if used
+            if session.get("total_details", {}).get("amount_discount"):
+                # Find pending redemption for this user
+                res = await db.execute(
+                    select(PromoRedemption).where(
+                        PromoRedemption.user_id == user.id,
+                        PromoRedemption.stripe_customer_id == user.payment_customer_id,
+                        PromoRedemption.status == "pending"
+                    )
+                )
+                redemption = res.scalars().first()
+                if redemption:
+                    redemption.status = "success"
+                    redemption.redeemed_at = datetime.utcnow()
+                    promo_res = await db.execute(select(PromoManagement).where(PromoManagement.promo_id == redemption.promo_id))
+                    promo = promo_res.scalars().first()
+                    if promo:
+                        promo.applied_count += 1
+                    await db.commit()
+
             await db.commit()
 
+    # ✅ Renewal / Plan update
     elif event["type"] in ["customer.subscription.updated", "customer.subscription.deleted"]:
         sub_obj = event["data"]["object"]
         subscription_id = sub_obj["id"]
@@ -249,4 +293,3 @@ async def get_subscription_status(user=Depends(get_current_user), db: AsyncSessi
         status=sub.status,
         current_period_end=sub.current_period_end
     )
-

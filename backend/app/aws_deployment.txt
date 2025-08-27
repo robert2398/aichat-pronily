@@ -133,3 +133,91 @@ You are roleplaying as a replace_character_gender character having character nam
 
 - **Immersion**: Describe small actions or emotions (*touches your hand gently*, *blushes lightly*), but keep balance so it feels like natural chat.
 - **Goal**: Make the user feel like they’re chatting with a caring, romantic and erotic partner in a natural, immersive way.
+
+
+
+-- Promo Management Table
+CREATE TABLE promo_management (
+    promo_id BIGSERIAL PRIMARY KEY,  -- internal PK
+    promo_name VARCHAR(255) NOT NULL,
+    coupon VARCHAR(100) NOT NULL UNIQUE,  -- human code (UPPER)
+    percent_off NUMERIC(5,2) NOT NULL CHECK (percent_off >= 0 AND percent_off <= 100),
+    stripe_promotion_id VARCHAR(100) UNIQUE,   -- promo_XXXX from Stripe
+    stripe_coupon_id VARCHAR(100),            -- coupon_XXXX from Stripe
+    start_date TIMESTAMPTZ NULL,
+    expiry_date TIMESTAMPTZ NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'active',
+    applied_count INT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_coupon_upper CHECK (coupon = UPPER(coupon)),
+    CONSTRAINT chk_dates_order CHECK (
+        expiry_date IS NULL OR start_date IS NULL OR start_date <= expiry_date
+    )
+);
+
+-- Promo Redemption Table
+CREATE TABLE promo_redemption (
+    redemption_id BIGSERIAL PRIMARY KEY,
+    promo_id BIGINT NOT NULL REFERENCES promo_management(promo_id) ON DELETE RESTRICT,
+    promo_code VARCHAR(100) NOT NULL,
+    user_id BIGINT NOT NULL REFERENCES users(id),
+    order_id BIGINT UNIQUE, -- if you manage your own orders
+    stripe_invoice_id VARCHAR(100), -- invoice id from Stripe (in_xxx)
+    applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    discount_applied NUMERIC(10,2) NOT NULL,
+    subtotal_at_apply NUMERIC(10,2),
+    currency CHAR(3) NOT NULL DEFAULT 'USD',
+    CONSTRAINT chk_code_upper CHECK (promo_code = UPPER(promo_code)),
+    CONSTRAINT ux_promo_user_invoice UNIQUE (promo_id, user_id, stripe_invoice_id)
+);
+
+
+
+
+INSERT INTO pricing_plan (plan_name, pricing_id, price, discount, billing_cycle, status, coin_reward) VALUES ('Deluxe', 'price_1RnDyQFZp40kitrQWiXjPpdA', 10, 70, 'Monthly', 'Active', 100);
+INSERT INTO pricing_plan (plan_name, pricing_id, price, discount, billing_cycle, status, coin_reward) VALUES ('Deluxe', 'price_1RnO2MFZp40kitrQZM3oqIwh', 96, 60, 'Yearly', 'Active', 1200);
+INSERT INTO pricing_plan (plan_name, pricing_id, price, discount, billing_cycle, status, coin_reward) VALUES ('Premium', 'price_1RnDzwFZp40kitrQYvcwcraE', 25, 70, 'Monthly', 'Active', 300);
+INSERT INTO pricing_plan (plan_name, pricing_id, price, discount, billing_cycle, status, coin_reward) VALUES ('Premium', 'price_1RnO4FFZp40kitrQh9v0QgYW', 240, 60, 'Yearly', 'Active', 4000);
+INSERT INTO pricing_plan (plan_name, pricing_id, price, discount, billing_cycle, status, coin_reward) VALUES ('VIP', 'price_1RnDzwFZp40kitrQYvcwcraE', 50, 70, 'Monthly', 'Active', 1000);
+INSERT INTO pricing_plan (plan_name, pricing_id, price, discount, billing_cycle, status, coin_reward) VALUES ('VIP', 'price_1RnO4FFZp40kitrQh9v0QgYW', 500, 60, 'Yearly', 'Active', 10000);
+
+INSERT INTO promo_management (
+    promo_name, 
+    coupon, 
+    percent_off, 
+    stripe_promotion_id, 
+    stripe_coupon_id, 
+    start_date, 
+    expiry_date
+) VALUES (
+    'FestiveOfferMonthly', 
+    'FESTIVE70', 
+    70, 
+    'promo_1S0k3lFZp40kitrQFExxl15A', 
+    'cghbJvfV', 
+    '2025-01-01 00:00:00+00', 
+    '2025-01-31 23:59:59+00'
+);
+
+INSERT INTO promo_management (
+    promo_name, 
+    coupon, 
+    percent_off, 
+    stripe_promotion_id, 
+    stripe_coupon_id, 
+    start_date, 
+    expiry_date
+) VALUES (
+    'FestiveOfferYearly', 
+    'FESTIVE60', 
+    60, 
+    'promo_1S0jUtFZp40kitrQLRgG6TNn', 
+    'T5PK5FzZ', 
+    '2025-01-01 00:00:00+00', 
+    '2025-01-31 23:59:59+00'
+);
+
+
+
+“Your story begins here! ✨ Your payment was successful — new characters and adventures are now unlocked. Go ahead, create, chat, and bring your imagination to life!”

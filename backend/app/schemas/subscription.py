@@ -3,9 +3,10 @@ from datetime import datetime
 from typing import Optional
 
 class CheckoutSessionRequest(BaseModel):
-    email: str
-    plan_name: str
-    frequency: str  # "monthly" | "annualy"
+    price_id: str
+    coupon: str
+    discount_applied: float
+    subtotal_at_apply: float
 
 class CheckoutSessionResponse(BaseModel):
     session_id: str
@@ -34,6 +35,7 @@ class PricingPlanRead(BaseModel):
     pricing_id: str
     currency: str
     price: float
+    discount: float
     billing_cycle: str
     coin_reward: int
     status: str
@@ -50,6 +52,7 @@ class PricingPlanCreate(BaseModel):
     pricing_id: str
     currency: str
     price: float
+    discount: float
     billing_cycle: str
     coin_reward: int
     status: str
@@ -60,6 +63,7 @@ class PricingPlanUpdate(BaseModel):
     pricing_id: Optional[str] = None
     currency: Optional[str] = None
     price: Optional[float] = None
+    discount: Optional[float] = None
     billing_cycle: Optional[str] = None
     coin_reward: Optional[int] = None
     status: Optional[str] = None
@@ -70,6 +74,8 @@ class PromoManagementRead(BaseModel):
     promo_name: str
     coupon: str
     percent_off: float
+    stripe_promotion_id: str
+    stripe_coupon_id: str
     start_date: Optional[datetime]
     expiry_date: Optional[datetime]
     status: str
@@ -97,3 +103,8 @@ class PromoManagementUpdate(BaseModel):
     start_date: Optional[datetime] = None
     expiry_date: Optional[datetime] = None
     status: Optional[str] = None
+
+
+class PromoVerifyRequest(BaseModel):
+    promo_code: str
+    pricing_id: str

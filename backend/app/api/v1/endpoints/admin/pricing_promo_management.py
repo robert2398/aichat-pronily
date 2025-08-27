@@ -12,16 +12,6 @@ from app.schemas.subscription import (
 
 router = APIRouter()
 
-
-@router.get("/get-pricing", dependencies=[Depends(require_admin)], response_model=List[PricingPlanRead])
-async def get_pricing(db: AsyncSession = Depends(get_db)):
-    """
-    Retrieve all pricing plans.
-    """
-    result = await db.execute(select(PricingPlan).order_by(PricingPlan.plan_id))
-    pricing_plans = result.scalars().all()
-    return pricing_plans
-
 @router.post("/create-pricing", dependencies=[Depends(require_admin)], response_model=PricingPlanRead)
 async def create_pricing(
     pricing_data: PricingPlanCreate,
@@ -59,16 +49,6 @@ async def edit_pricing(
     await db.commit()
     await db.refresh(pricing_plan)
     return {"detail": f"Pricing plan {plan_id} has been updated."}
-
-
-@router.get("/get-promo", dependencies=[Depends(require_admin)], response_model=List[PromoManagementRead])
-async def get_promo(db: AsyncSession = Depends(get_db)):
-    """
-    Retrieve all promo data.
-    """
-    result = await db.execute(select(PromoManagement).order_by(PromoManagement.promo_id))
-    promo_data = result.scalars().all()
-    return promo_data
 
 @router.post("/create-promo", dependencies=[Depends(require_admin)], response_model=PromoManagementRead)
 async def create_promo(

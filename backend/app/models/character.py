@@ -15,7 +15,7 @@ from sqlalchemy.sql import func
 
 class Character(Base):
     __tablename__ = "characters"
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     username = Column(String, nullable=False)
     bio = Column(Text)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)

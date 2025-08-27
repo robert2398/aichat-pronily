@@ -1,7 +1,7 @@
 """
 Subscription SQLAlchemy model.
 """
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric, BigInteger, CheckConstraint, CHAR, Text
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Boolean, Numeric, BigInteger, CheckConstraint, CHAR, Text, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.models.base import Base
 from sqlalchemy.sql import func
@@ -9,7 +9,7 @@ from sqlalchemy.sql import func
 class Subscription(Base):
     __tablename__ = "subscriptions"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     payment_customer_id = Column(String, nullable=False)
     payment_subscription_id = Column(String, nullable=False)
@@ -31,13 +31,15 @@ class Subscription(Base):
 class PromoManagement(Base):
     __tablename__ = "promo_management"
 
-    promo_id = Column(BigInteger, primary_key=True, index=True)
+    promo_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)  # keep as internal PK
     promo_name = Column(String(255), nullable=False)
-    coupon = Column(String(100), nullable=False, unique=True)
+    coupon = Column(String(100), nullable=False, unique=True)  # human code (UPPER)
     percent_off = Column(Numeric(5, 2), nullable=False)
+    stripe_promotion_id = Column(String(100), nullable=True, unique=True)   # NEW: stores promo_... id
+    stripe_coupon_id = Column(String(100), nullable=True)  # optional: store coupon_... id
     start_date = Column(DateTime(timezone=True), nullable=True)
     expiry_date = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String(20), nullable=False, server_default='active')
+    status = Column(String(20), nullable=False, server_default='Active')
     applied_count = Column(Integer, nullable=False, server_default='0')
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -49,19 +51,18 @@ class PromoManagement(Base):
         CheckConstraint('expiry_date IS NULL OR start_date IS NULL OR start_date <= expiry_date', name='chk_dates_order'),
     )
 
-
 class PricingPlan(Base):
     __tablename__ = "pricing_plan"
 
-    plan_id = Column(Integer, primary_key=True, index=True)
+    plan_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     plan_name = Column(String(255), nullable=False)
     pricing_id = Column(String(255), nullable=False)
     currency = Column(CHAR(3), nullable=False, server_default='USD')
     price = Column(Numeric(10, 2), nullable=False)
     discount = Column(Numeric(10, 2), nullable=True)
-    billing_cycle = Column(String(50), nullable=False)  # e.g. 'monthly', 'yearly'
+    billing_cycle = Column(String(50), nullable=False)  # e.g. 'Monthly', 'Yearly'
     coin_reward = Column(Integer, nullable=False, default=0)
-    status = Column(String(50), nullable=False)  # e.g. 'active', 'inactive'
+    status = Column(String(50), nullable=False)  # e.g. 'Active', 'Inactive'
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
@@ -69,28 +70,32 @@ class PricingPlan(Base):
 class PromoRedemption(Base):
     __tablename__ = "promo_redemption"
 
-    redemption_id = Column(BigInteger, primary_key=True, index=True)
+    redemption_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
     promo_id = Column(BigInteger, ForeignKey("promo_management.promo_id", ondelete="RESTRICT"), nullable=False)
     promo_code = Column(String(100), nullable=False)
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
-    order_id = Column(BigInteger, unique=True, nullable=True)
+    order_id = Column(BigInteger, unique=True, nullable=True)  # keep if you use your own order IDs
+    stripe_invoice_id = Column(String(100), nullable=True)   # NEW: store Stripe invoice id (in_...)
     applied_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     discount_applied = Column(Numeric(10, 2), nullable=False)
     subtotal_at_apply = Column(Numeric(10, 2), nullable=True)
     currency = Column(CHAR(3), nullable=False, server_default='USD')
-
+    status = Column(String(20), nullable=False, server_default='pending')  # 'pending', 'redeemed', 'failed'
     promo = relationship("PromoManagement", back_populates="redemptions")
     user = relationship("User", back_populates="promo_redemptions")
 
     __table_args__ = (
         CheckConstraint('promo_code = UPPER(promo_code)', name='chk_code_upper'),
+        # unique constraint to avoid duplicate redemption rows for same promo+user+invoice
+        UniqueConstraint('promo_id', 'user_id', 'stripe_invoice_id', name='ux_promo_user_invoice')
     )
+
 
 
 class UserWallet(Base):
     __tablename__ = "user_wallets"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     coin_balance = Column(Integer, nullable=False, server_default='0')
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
@@ -100,7 +105,7 @@ class UserWallet(Base):
 class CoinTransaction(Base):
     __tablename__ = "coin_transactions"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     subscription_id = Column(Integer, ForeignKey("subscriptions.id"), nullable=True)
     coins = Column(Integer, nullable=False)  # positive for earn, negative for spend
@@ -117,7 +122,7 @@ class CoinTransaction(Base):
 class Media(Base):
     __tablename__ = "media"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     media_type = Column(String(50), nullable=False)
     s3_url = Column(Text, nullable=True)
