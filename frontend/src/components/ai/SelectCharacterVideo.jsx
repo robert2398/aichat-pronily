@@ -5,18 +5,17 @@ function VariantTile({ item, onSelect }) {
   return (
     <button
       type="button"
-      onClick={() => onSelect(item)}
-      className="relative w-full overflow-hidden rounded-xl border border-white/10 bg-white/[.02] shadow-sm text-left hover:border-white/20"
+  onClick={() => onSelect(item)}
+  className="relative w-full overflow-hidden rounded-xl text-left"
     >
       {item.thumb ? (
         <img src={item.thumb} alt={item.name} className="h-56 w-full object-cover" />
       ) : (
         <div className="h-56 w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />
       )}
-      <div className="absolute inset-0 bg-black/20" />
-      <div className="absolute inset-x-0 bottom-0 p-3">
-        <div className="rounded-lg bg-[#1b1426]/85 px-3 py-2 ring-1 ring-inset ring-white/10 backdrop-blur">
-          <p className="text-white text-sm font-semibold">{item.name}</p>
+      <div className="absolute left-3 right-3 bottom-3 p-0">
+        <div className="px-3 pb-2">
+          <p className="text-white text-sm font-semibold drop-shadow-md">{item.name}</p>
         </div>
       </div>
     </button>

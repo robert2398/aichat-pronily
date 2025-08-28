@@ -1,1 +1,14 @@
 @import "tailwindcss";
+
+/* Force transparent bottom overlays used for image labels so no rectangular box appears.
+	 Targets the common structure used across cards: an absolutely positioned container
+	 near the bottom (left-3 right-3 bottom-3) which sometimes contains a rounded bg box.
+	 This is intentionally specific and uses !important as a last-resort override for visual testing.
+*/
+.absolute.left-3.right-3.bottom-3 > * {
+	background: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	backdrop-filter: none !important;
+}
+

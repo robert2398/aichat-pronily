@@ -289,9 +289,9 @@ export default function CreateCharacter() {
                 >
                   <div className="h-56 w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.18),rgba(255,255,255,0)_70%)]" />
                   <div className="absolute inset-0 bg-black/30" />
-                  <div className="absolute inset-x-0 bottom-0 p-3">
-                    <div className="backdrop-blur rounded-xl bg-[#1b1426]/80 px-3 py-2 ring-1 ring-inset ring-white/10">
-                      <h3 className="text-sm font-semibold text-white">{label}</h3>
+                  <div className="absolute left-3 right-3 bottom-3 p-0">
+                    <div className="px-3 pb-2">
+                      <h3 className="text-sm font-semibold text-white drop-shadow-md">{label}</h3>
                     </div>
                   </div>
                 </button>

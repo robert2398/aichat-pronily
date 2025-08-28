@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { Mars, Venus, Transgender, Image, Palette } from "lucide-react";
+import { Mars, Venus, Transgender, Image, Palette, Heart, MessageSquare } from "lucide-react";
 import Dropdown from "../ui/Dropdown";
 
 // simple pill
@@ -23,18 +23,35 @@ function CharacterTile({ item, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(item)}
-      className="relative w-full overflow-hidden rounded-xl border border-white/10 bg-white/[.02] shadow-sm text-left hover:border-white/20"
+      className="relative w-full overflow-hidden rounded-xl text-left"
     >
       {/* image or fallback */}
       {item.img ? (
         <img src={item.img} alt={item.name} className="h-64 w-full object-cover" />
       ) : (
-        <div className="h-64 w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.16),rgba(255,255,255,0)_70%)]" />
+        <div className="h-64 w-full bg-transparent" />
       )}
-      <div className="absolute inset-0 bg-black/25" />
-      <div className="absolute inset-x-0 bottom-0 p-3">
-        <div className="rounded-lg bg-[#1b1426]/85 px-3 py-2 ring-1 ring-inset ring-white/10 backdrop-blur">
-          <p className="text-white text-sm font-semibold">{item.name}</p>
+      {/* subtle bottom gradient for legibility */}
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/45 pointer-events-none" />
+      <div className="absolute left-4 right-4 bottom-4 p-0">
+        <div className="px-2 pb-1">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-white text-lg font-semibold leading-tight drop-shadow-md">{item.name}, {item.age}</p>
+          </div>
+          {item.bio ? (
+            <p className="mt-2 text-sm text-pink-300 leading-snug max-h-12 overflow-hidden text-ellipsis drop-shadow-sm">{item.bio}</p>
+          ) : null}
+
+          <div className="mt-3 flex items-center gap-4 text-sm">
+            <span className="inline-flex items-center gap-2 text-pink-300">
+              <Heart className="h-4 w-4 text-pink-400" aria-hidden />
+              {item.likes}
+            </span>
+            <span className="inline-flex items-center gap-2 text-white/90">
+              <MessageSquare className="h-4 w-4" aria-hidden />
+              {item.messages}
+            </span>
+          </div>
         </div>
       </div>
     </button>
@@ -64,11 +81,15 @@ export default function SelectCharacter() {
   const characters = useMemo(
     () =>
       Array.from({ length: 12 }).map((_, i) => ({
-        id: i + 1,
-        name: `Luna, ${20 + (i % 6)}`,
-        img: "",
-        gender: i % 3 === 0 ? "female" : i % 3 === 1 ? "male" : "trans",
-        style: i % 5 === 0 ? "anime" : "realistic",
+  id: i + 1,
+  name: `Luna ${i + 1}`,
+  age: 20 + (i % 6),
+  bio: "Luna Smith is pure temptation. With soft hair, a backless gown hugging..",
+  img: "",
+  likes: "1.5k",
+  messages: "1M",
+  gender: i % 3 === 0 ? "female" : i % 3 === 1 ? "male" : "trans",
+  style: i % 5 === 0 ? "anime" : "realistic",
       })),
     []
   );

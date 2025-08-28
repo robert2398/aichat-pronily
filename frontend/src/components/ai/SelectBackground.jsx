@@ -11,9 +11,9 @@ function BackgroundTile({ item, onSelect }) {
     >
       {item.img ? <img src={item.img} alt={item.name} className="h-40 w-full object-cover" /> : <div className="h-40 w-full bg-white/[.02]" />}
       <div className="absolute inset-0 bg-black/25" />
-      <div className="absolute inset-x-0 bottom-0 p-3">
-        <div className="rounded-lg bg-[#1b1426]/85 px-3 py-2 ring-1 ring-inset ring-white/10 backdrop-blur">
-          <p className="text-white text-sm font-semibold">{item.name}</p>
+      <div className="absolute left-3 right-3 bottom-3 p-0">
+        <div className="px-3 pb-2">
+          <p className="text-white text-sm font-semibold drop-shadow-md">{item.name}</p>
         </div>
       </div>
     </button>

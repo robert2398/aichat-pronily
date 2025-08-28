@@ -2,13 +2,20 @@ import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { PhoneCall, MoreVertical, Search, ChevronLeft, Send, ShieldCheck } from "lucide-react";
 
+// prefer S3 image url, fall back to local img — keep a single source-of-truth
+const getCharacterImageUrl = (c) => {
+  const a = typeof (c === null || c === void 0 ? void 0 : c.image_url_s3) === "string" ? c.image_url_s3 : "";
+  const b = typeof (c === null || c === void 0 ? void 0 : c.img) === "string" ? c.img : "";
+  return a || b;
+};
+
 function ChatCharacterCard({ item, onOpen }) {
   return (
     <div className="relative">
       <button
         type="button"
         onClick={() => onOpen(item)}
-        className="relative w-full overflow-hidden rounded-xl border border-white/10 bg-white/[.02] shadow-sm text-left hover:border-white/20"
+  className="relative w-full overflow-hidden rounded-xl text-left"
       >
   <div className="h-80 w-full overflow-hidden">
           {item.img ? (
@@ -17,11 +24,10 @@ function ChatCharacterCard({ item, onOpen }) {
             <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />
           )}
         </div>
-        <div className="absolute inset-0 bg-black/25" />
-        <div className="absolute inset-x-0 bottom-0 p-3">
-          <div className="rounded-lg bg-[#1b1426]/85 px-3 py-2 ring-1 ring-inset ring-white/10 backdrop-blur">
-            <p className="text-white text-sm font-semibold">{item.name}</p>
-            <p className="text-white/60 text-xs mt-1">
+        <div className="absolute left-3 right-3 bottom-3 p-0">
+          <div className="px-3 pb-2">
+            <p className="text-white text-sm font-semibold drop-shadow-md">{item.name}</p>
+            <p className="text-white/60 text-xs mt-1 drop-shadow-sm">
               {item.age} • {item.desc}
             </p>
           </div>
@@ -134,6 +140,7 @@ export default function AiChat() {
   const messagesRef = useRef(null);
   const endRef = useRef(null);
   const mainRef = useRef(null);
+  const composerRef = useRef(null);
 
   // Track whether user is near bottom so we don't yank scroll when they scroll up
   const userAtBottomRef = useRef(true);
@@ -203,11 +210,23 @@ export default function AiChat() {
       } catch (e) {}
     };
   }, []);
-  // ⚙️ Viewport-fit logic:
-  // Measure the actual top offset of the main chat container and size it to the viewport.
+  // ⚙️ Viewport-fit logic: size to viewport under whatever sits above <main>
   const setHeights = () => {
-    const top = mainRef.current?.getBoundingClientRect().top ?? 0;
-    document.documentElement.style.setProperty("--chat-top", `${Math.max(0, Math.round(top))}px`);
+    try {
+      if (!mainRef.current) return;
+      const top = Math.max(0, Math.round(mainRef.current.getBoundingClientRect().top));
+      document.documentElement.style.setProperty("--chat-top", `${top}px`);
+    } catch (e) {}
+  };
+
+  // Keep messages' bottom padding equal to composer height
+  const syncComposerPadding = () => {
+    try {
+      const h = composerRef.current?.offsetHeight ?? 0;
+      // add a tiny buffer so the last bubble clears the radius/shadow
+      const total = Math.round(h + 8);
+      messagesRef.current?.style?.setProperty("--composer-h", `${total}px`);
+    } catch (e) {}
   };
 
   // run after layout & on resize, but only when a chat is open (id present)
@@ -224,6 +243,22 @@ export default function AiChat() {
       window.removeEventListener("resize", setHeights);
       // remove the css var when leaving chat
       document.documentElement.style.removeProperty("--chat-top");
+    };
+  }, [id]);
+
+  // Observe composer size to keep padding tight
+  useEffect(() => {
+    if (!composerRef.current) return;
+    syncComposerPadding();
+    let ro;
+    try {
+      ro = new ResizeObserver(syncComposerPadding);
+      ro.observe(composerRef.current);
+    } catch (e) {}
+    window.addEventListener("resize", syncComposerPadding);
+    return () => {
+      try { ro && composerRef.current && ro.unobserve(composerRef.current); } catch (e) {}
+      window.removeEventListener("resize", syncComposerPadding);
     };
   }, [id]);
 
@@ -395,6 +430,7 @@ export default function AiChat() {
             desc: d.bio || "",
             img: finalUrl,
             bio: d.bio || "",
+            image_url_s3: d.image_url_s3 || "",
           };
         });
         setCharacters(mapped);
@@ -419,7 +455,7 @@ export default function AiChat() {
     };
 
     return (
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-2">
+      <main className="mx-auto max-w-full px-0">
         <section className="w-full mx-auto px-0 sm:px-0 py-0">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
@@ -492,18 +528,19 @@ export default function AiChat() {
   return (
     <main
       ref={mainRef}
-      className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-2"
+      className="mx-auto max-w-full px-0"
       style={{
         // Height is the viewport minus the real top offset of this main element.
-        height: "calc(100dvh - var(--chat-top, 0px))",
+        height: "calc(105dvh - var(--chat-top, 0px))",
         overflow: "hidden",
+        marginTop: "-40px"
       }}
     >
   <div className="h-full flex flex-col min-h-0">
         {/* CHAT WINDOW */}
-  <div className="flex-1 rounded-2xl overflow-hidden border border-white/10 bg-white/[.02] grid grid-cols-12 min-h-0">
+  <div className="flex-1 overflow-hidden bg-white/[.02] grid grid-cols-12 min-h-0">
           {/* LEFT: chat list (search/header sticky) */}
-          <aside className="col-span-12 md:col-span-3 border-b md:border-b-0 md:border-r border-white/5 p-0 flex flex-col h-full min-h-0 overflow-x-hidden">
+          <aside className="col-span-12 md:col-span-3 border-b md:border-b-0 md:border-r border-white/5 p-0 flex flex-col h-full min-h-0 overflow-x-hidden text-xs">
             <div className="sticky top-0 z-20 bg-white/[.02] backdrop-blur px-4 pt-4 pb-3">
               <div className="flex items-center gap-3 mb-3">
                 <button
@@ -526,21 +563,21 @@ export default function AiChat() {
               </div>
             </div>
 
-            <div className="p-4 space-y-3 flex-1 overflow-y-auto">
+            <div className="p-3 space-y-2 flex-1 overflow-y-auto">
               {characters.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => navigate(`/ai-chat/${c.id}`)}
-                  className={`flex items-center gap-3 w-full text-left p-2 rounded-lg hover:bg-white/5 ${
+                  className={`flex items-center gap-2 w-full text-left p-1.5 rounded-lg hover:bg-white/5 ${
                     String(c.id) === String(selectedSafe.id) ? "bg-white/5" : ""
                   }`}
                 >
-                  <div className="h-14 w-12 rounded-lg overflow-hidden">
-                    {c.img ? <img src={c.img} alt={c.name} className="h-full w-full object-cover object-top rounded-lg" /> : <div className="h-full w-full rounded-lg bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />}
+                  <div className="h-12 w-12 rounded-full overflow-hidden">
+                    {(c.image_url_s3 || c.img) ? <img src={c.image_url_s3 || c.img} alt={c.name} className="h-full w-full object-cover object-top" /> : <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />}
                   </div>
                   <div className="flex-1">
-                    <div className="text-sm font-medium">{c.name}</div>
-                    <div className="text-xs text-white/60">Last message preview…</div>
+                    <div className="text-xs font-medium">{c.name}</div>
+                    <div className="text-[11px] text-white/60">Last message preview…</div>
                   </div>
                   <div className="text-xs text-white/50">12:35 PM</div>
                 </button>
@@ -552,7 +589,12 @@ export default function AiChat() {
           <section className="col-span-12 md:col-span-6 p-4 flex flex-col h-full min-h-0">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-lg bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />
+                <div className="h-10 w-10 rounded-full overflow-hidden">
+                  {(selectedSafe.image_url_s3 || selectedSafe.img) ? 
+                    <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={selectedSafe.name} className="h-full w-full object-cover object-top" /> : 
+                    <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />
+                  }
+                </div>
                 <div>
                   <div className="text-sm font-semibold">{selectedSafe.name}</div>
                   <div className="flex items-center gap-2 text-xs">
@@ -570,7 +612,12 @@ export default function AiChat() {
               </div>
             </div>
 
-            <div ref={messagesRef} onScroll={handleMessagesScroll} className="flex-1 overflow-y-auto p-2 space-y-3 pb-20 h-full min-h-0">
+            <div
+              ref={messagesRef}
+              onScroll={handleMessagesScroll}
+              className="flex-1 overflow-y-auto p-2 space-y-3 h-full min-h-0"
+              style={{ paddingBottom: 'var(--composer-h, 64px)' }}
+            >
               {messages.map((m) => (
                 <div
                   key={m.id}
@@ -586,7 +633,7 @@ export default function AiChat() {
             </div>
 
             {/* input */}
-            <div className="mt-3 sticky bottom-0 bg-transparent">
+            <div ref={composerRef} className="mt-3 sticky bottom-0 bg-transparent">
               <div className="flex items-center gap-2">
                 <textarea
                   value={text}
@@ -610,22 +657,156 @@ export default function AiChat() {
 
           {/* RIGHT: profile */}
           <aside className="col-span-12 md:col-span-3 md:border-l border-white/5 p-4 flex flex-col h-full min-h-0 overflow-y-auto">
-            <div className="h-44 w-full rounded-xl bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.16),rgba(255,255,255,0)_70%)] mb-4" />
-            <h3 className="text-lg font-semibold mb-2">{selectedSafe.name}</h3>
-            <p className="text-sm text-white/70 mb-4">{selectedSafe.bio}</p>
+            {/* Image / hero */}
+            <div className="relative mb-4">
+  {(() => {
+    const heroUrl = selectedSafe.image_url_s3 || selectedSafe.img;
+    return heroUrl ? (
+      <img
+        key={`hero-${selectedSafe.id}-${heroUrl}`}
+        src={heroUrl}
+        alt={selectedSafe.name || "Character"}
+        className="block w-full h-80 rounded-xl object-cover object-top"
+        loading="eager"
+        decoding="async"
+        onError={(e) => {
+          // graceful fallback if this URL 404s/expirs
+          try { (e.currentTarget).replaceWith(
+            Object.assign(document.createElement("div"), {
+              className: "w-full h-80 rounded-xl bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.16),rgba(255,255,255,0)_70%)]"
+            })
+          ); } catch {}
+        }}
+      />
+    ) : (
+      <div className="w-full h-80 rounded-xl bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.16),rgba(255,255,255,0)_70%)]" />
+    );
+  })()}
 
-            <div className="grid grid-cols-2 gap-3">
-              <button className="rounded-xl px-3 py-2 bg-white/[.02]">Generate image</button>
-              <button className="rounded-xl px-3 py-2 bg-white/[.02]">View gallery</button>
+  {/* left/right arrows */}
+  <button aria-hidden className="absolute left-3 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white border border-white/10">
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  </button>
+  <button aria-hidden className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/30 text-white border border-white/10">
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M9 6l6 6-6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+  </button>
+
+  {/* name + age overlay */}
+  <div className="absolute left-4 bottom-4 text-left">
+    <div className="text-white text-xl md:text-2xl font-semibold drop-shadow-md">
+      {selectedSafe.name}{selectedSafe.age ? `, ${selectedSafe.age}` : ""}
+    </div>
+  </div>
+</div>
+
+            {/* description */}
+            <p className="text-sm text-white/70 mb-4">{selectedSafe.bio || 'Avatara is loving and empathetic, she loves playing with cats and dancing.'}</p>
+
+            {/* Generate image */}
+            <button onClick={() => navigate(`/ai-image?character=${selectedSafe.id}`)} className="w-full rounded-xl px-6 py-3 text-base font-semibold text-white bg-gradient-to-r from-pink-500 via-pink-400 to-indigo-500 shadow mb-4">✨ Generate image</button>
+
+            {/* Gallery */}
+            <div className="mb-4">
+              <div className="text-sm font-medium text-pink-400 mb-2">Gallery</div>
+              <div className="grid grid-cols-3 gap-2">
+                {[0,1,2].map((i) => (
+                  <div key={i} className="relative h-16 w-full rounded-lg overflow-hidden bg-white/[.02]">
+                    {(selectedSafe.image_url_s3 || selectedSafe.img) ? (
+                      <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={`thumb-${i}`} className="w-full h-full object-cover object-top" />
+                    ) : (
+                      <div className="w-full h-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.16),rgba(255,255,255,0)_70%)]" />
+                    )}
+                    {i === 2 && (
+                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs font-medium">View More</div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
 
-            <div className="mt-6 text-xs text-white/60">
-              <div className="font-medium text-white/80 mb-2">Details</div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>Body: Fit</div>
-                <div>Eye: Green</div>
-                <div>Hair: Brown</div>
-                <div>Ethnicity: Caucasian</div>
+            {/* Details */}
+            <div className="mb-4">
+              <div className="text-[10px] font-medium text-white/80 mb-2">Details</div>
+              <div className="grid grid-cols-2 gap-1">
+                <div className="flex items-center gap-2 text-[10px]">
+                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">👤</div>
+                  <div>
+                    <div className="text-[8px] text-white/60">BODY</div>
+                    <div className="text-white text-[10px]">Fit</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">🌍</div>
+                  <div>
+                    <div className="text-[8px] text-white/60">ETHNICITY</div>
+                    <div className="text-white text-[10px]">Caucasian</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">👁️</div>
+                  <div>
+                    <div className="text-[8px] text-white/60">EYE</div>
+                    <div className="text-white text-[10px]">Green</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">💇</div>
+                  <div>
+                    <div className="text-[8px] text-white/60">HAIR</div>
+                    <div className="text-white text-[10px]">Brown, Straight</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">🍒</div>
+                  <div>
+                    <div className="text-[8px] text-white/60">BREAST</div>
+                    <div className="text-white text-[10px]">Big</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">🍑</div>
+                  <div>
+                    <div className="text-[8px] text-white/60">BUTT</div>
+                    <div className="text-white text-[10px]">Big</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Her Traits */}
+            <div>
+              <div className="text-[10px] font-medium text-pink-400 mb-2">Her Traits</div>
+              <div className="grid grid-cols-2 gap-1">
+                {/* First row: Personality and Occupation */}
+                <div className="flex items-center gap-2 text-[10px]">
+                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">🧠</div>
+                  <div>
+                    <div className="text-[8px] text-white/60">PERSONALITY</div>
+                    <div className="text-white text-[10px]">Lover</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[10px]">
+                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">🎭</div>
+                  <div>
+                    <div className="text-[8px] text-white/60">OCCUPATION</div>
+                    <div className="text-white text-[10px]">Actress</div>
+                  </div>
+                </div>
+                {/* Second row: Hobbies and Relationship */}
+                <div className="flex items-start gap-2 text-[10px] col-span-2">
+                  <div className="w-4 h-4 flex items-center justify-center text-[8px] flex-shrink-0 mt-0.5">🎨</div>
+                  <div>
+                    <div className="text-[8px] text-white/60">HOBBIES</div>
+                    <div className="text-white text-[10px] leading-tight">Ambitious, Empathetic, Caring, Writing Poetry, Bird Watching</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] col-span-2">
+                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">💖</div>
+                  <div>
+                    <div className="text-[8px] text-white/60">RELATIONSHIP</div>
+                    <div className="text-white text-[10px]">Stranger</div>
+                  </div>
+                </div>
               </div>
             </div>
           </aside>

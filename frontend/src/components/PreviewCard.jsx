@@ -36,8 +36,7 @@ export default function PreviewCard({
     <button
       type="button"
       onClick={onClick}
-      className={`relative w-full overflow-hidden rounded-xl border bg-white/[.02] shadow-sm text-left
-        ${selected ? "border-pink-500/70 ring-1 ring-pink-500/30" : "border-white/8 hover:border-white/12"}`}
+      className={`relative w-full overflow-hidden rounded-xl text-left`}
       aria-label={name || "Preview item"}
     >
       {/* Media area */}
@@ -57,8 +56,8 @@ export default function PreviewCard({
           <div className="absolute inset-0 bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.16),rgba(255,255,255,0)_70%)]" />
         )}
 
-        {/* Dim overlay */}
-        <div className="absolute inset-0 bg-black/18" />
+  {/* Dim overlay — keep subtle transparent dim if needed */}
+  <div className="absolute inset-0 bg-transparent" />
 
         {/* Video play indicator */}
         {variant === "video" && !loading && (
@@ -82,15 +81,15 @@ export default function PreviewCard({
         )}
       </div>
 
-      {/* Bottom bar */}
-      <div className="absolute inset-x-0 bottom-0 p-3">
-        <div className="flex items-center justify-between rounded-xl bg-[#1b1426]/85 px-3 py-2 ring-1 ring-inset ring-white/10 backdrop-blur">
-          <h4 className="line-clamp-1 text-sm font-semibold text-white">
+      {/* Bottom overlay text (transparent, no box) */}
+      <div className="absolute left-3 right-3 bottom-3 p-0">
+        <div className="px-3 pb-2 flex items-center justify-between">
+          <h4 className="line-clamp-1 text-sm font-semibold text-white drop-shadow-md">
             {name || (loading ? "Loading…" : "Untitled")}
           </h4>
-          <span className="inline-flex items-center gap-1 text-xs text-white/90">
-            <Heart className="h-3.5 w-3.5" aria-hidden />
-            {String(likes ?? "")}
+          <span className="inline-flex items-center gap-2 text-xs text-pink-300 drop-shadow-sm">
+            <Heart className="h-3.5 w-3.5 text-pink-400" aria-hidden />
+            {String(likes ?? "1.5k")}
           </span>
         </div>
       </div>
