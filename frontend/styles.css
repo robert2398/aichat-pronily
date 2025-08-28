@@ -12,3 +12,46 @@
 	backdrop-filter: none !important;
 }
 
+/* Themed scrollbars for chat view */
+/* Only apply when the chat overlay is open to avoid changing native scrollbars elsewhere */
+body[data-chat-open="1"] .overflow-y-auto,
+body[data-chat-open="1"] .overflow-auto,
+body[data-chat-open="1"] .overflow-hidden {
+	/* ensure Firefox uses the thin style */
+	scrollbar-width: thin;
+	scrollbar-color: rgba(255,255,255,0.12) transparent;
+}
+
+/* WebKit browsers (Chrome, Edge, Safari) */
+body[data-chat-open="1"] ::-webkit-scrollbar {
+	width: 10px;
+	height: 10px;
+}
+
+body[data-chat-open="1"] ::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+body[data-chat-open="1"] ::-webkit-scrollbar-thumb {
+	background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+	border-radius: 999px;
+	border: 2px solid transparent; /* space around thumb for crisp rounded look */
+	background-clip: padding-box;
+	box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25);
+}
+
+body[data-chat-open="1"] ::-webkit-scrollbar-thumb:hover {
+	background: linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0.08));
+}
+
+/* Keep the scrollbar corner transparent */
+body[data-chat-open="1"] ::-webkit-scrollbar-corner {
+	background: transparent;
+}
+
+/* Small accessibility tweak: ensure focus-visible outlines remain on interactive scrollable regions */
+body[data-chat-open="1"] .overflow-y-auto:focus-visible,
+body[data-chat-open="1"] .overflow-auto:focus-visible {
+	outline: none;
+}
+
