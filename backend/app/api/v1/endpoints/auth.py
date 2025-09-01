@@ -290,6 +290,27 @@ async def login(
         path="/",
     )
 
-    return LoginResponse(access_token=access_token)
+    # include serialized user details in the response
+    # ensure we never return None for full_name (UserRead.full_name is required)
+    full_name = user.full_name or (user.email.split('@')[0].replace('.', ' ') if user.email else "")
+
+    # Normalize role to return the underlying value or name (avoid Enum representation like 'RoleEnum.ADMIN')
+    try:
+        role_value = getattr(user.role, "value", None) or getattr(user.role, "name", None) or str(user.role)
+    except Exception:
+        role_value = str(user.role)
+
+    user_data = {
+        "id": user.id,
+        "email": user.email,
+        "full_name": str(full_name),
+        "role": role_value,
+        "is_active": bool(user.is_active),
+        "is_email_verified": bool(user.is_email_verified),
+        "created_at": user.created_at,
+        "updated_at": user.updated_at,
+    }
+
+    return LoginResponse(access_token=access_token, user=user_data)
 
 

@@ -278,8 +278,35 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     return {"status": "success"}
 
 
-@router.get("/subscription/status", response_model=SubscriptionStatusResponse)
-async def get_subscription_status(user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+@router.get("/status", response_model=SubscriptionStatusResponse)
+async def get_subscription_status(request: Request, db: AsyncSession = Depends(get_db)):
+    """
+    Return current subscription status for the authenticated user.
+
+    If the user cannot be resolved from the bearer token in Authorization header, return status=False.
+    """
+    # Extract bearer token from Authorization header (if any)
+    auth_header = request.headers.get("authorization") or request.headers.get("Authorization")
+    token = None
+    if auth_header and isinstance(auth_header, str):
+        parts = auth_header.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            token = parts[1]
+
+    # Try to resolve current user from token if provided
+    user = None
+    if token:
+        try:
+            from app.services.auth import AuthService
+
+            user = await AuthService.get_user_from_token(token, db)
+        except Exception:
+            user = None
+
+    if not user:
+        # user not found -> return explicit false status
+        return SubscriptionStatusResponse(status=False)
+
     result = await db.execute(
         select(Subscription)
         .where(Subscription.user_id == user.id)
@@ -287,7 +314,7 @@ async def get_subscription_status(user=Depends(get_current_user), db: AsyncSessi
     )
     sub = result.scalars().first()
     if not sub:
-        return SubscriptionStatusResponse()
+        return SubscriptionStatusResponse(status=False)
     return SubscriptionStatusResponse(
         plan_name=sub.plan_name,
         status=sub.status,

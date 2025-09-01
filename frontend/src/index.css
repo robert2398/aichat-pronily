@@ -13,3 +13,215 @@ body[data-chat-open="1"] footer,
 body[data-chat-open="1"] .site-footer {
   display: none !important;
 }
+
+/* Chat UI visual improvements */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,600;1,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700&family=Inter:wght@400;500;600&display=swap');
+
+:root{
+  --chat-user-grad: linear-gradient(135deg,#ff2d92,#ff5ebc);
+  --chat-ai-bg: #1f1f2e;
+  --chat-accent: #ff80c0;
+}
+
+body, .message, .bubble, textarea {
+  font-family: 'Poppins', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+}
+
+.message-wrapper {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  width: 100%;
+  animation: fadeInUp .28s ease both;
+}
+
+.message-inner { display:flex; align-items:flex-end; width:100%; }
+
+.message-ai { justify-content: flex-start; }
+.message-user { justify-content: flex-end; }
+
+.avatar { width:36px; height:36px; flex:0 0 36px; border-radius:999px; overflow:hidden; background:linear-gradient(135deg,#22212a,#2b2b36); display:inline-flex; align-items:center; justify-content:center; }
+.avatar img { width:100%; height:100%; object-fit:cover; display:block; }
+.avatar-initials { color:#fff; font-size:12px; font-weight:600; padding:4px; }
+
+.bubble {
+  /* New approach: relative bubble with an absolutely-positioned time in the bottom-right.
+     A small inline spacer after the message text (width set via --tsw) reserves horizontal
+     space only on the last line. This avoids layout gaps on earlier lines. */
+  max-width: 75%;
+  padding: 12px 16px;
+  border-radius: 20px;
+  line-height: 1.45;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.45);
+  position: relative; /* container for absolute time */
+  /* ensure content can flow normally; spacer controls last-line clearing */
+}
+
+.message-user .bubble {
+  margin-left: auto;
+  background: var(--chat-user-grad);
+  color: white;
+  box-shadow: 0 8px 22px rgba(255,45,146,0.28);
+}
+
+/* Make user bubbles a bit thinner (reduce vertical padding) */
+.message-user .bubble {
+  padding: 8px 16px;
+}
+
+.message-ai .bubble {
+  margin-right: auto;
+  background: linear-gradient(180deg, rgba(31,31,46,0.98), rgba(28,28,34,0.95));
+  color: #f0f0f5;
+  border: 1px solid rgba(44,44,58,0.6);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.38);
+  /* Thinner AI bubbles: reduced vertical padding */
+  padding: 8px 14px;
+}
+
+/* Slightly smaller font for AI messages for visual hierarchy */
+.message-ai .bubble,
+.message-ai .bubble .text-sm {
+  font-size: 0.86rem;
+}
+
+.bubble .message-time {
+  position: absolute;
+  right: 12px;
+  bottom: 8px;
+  font-size: 11px;
+  color: rgba(255,255,255,0.75);
+  white-space: nowrap; /* never wrap */
+  pointer-events: none;
+}
+
+/* Spacer element uses the measured width of the time (set as --tsw) to reserve space
+   only on the last text line (inline-block behavior). */
+.bubble .text-sm > .inline-block[style] {
+  display: inline-block;
+  vertical-align: baseline;
+  width: var(--tsw, 0px);
+  height: 1px; /* tiny height so it doesn't affect line height except on last line */
+}
+
+.bubble em { color: var(--chat-accent); font-style: italic; }
+
+/* Typing indicator */
+.typing { display:flex; gap:6px; align-items:center; padding:10px 14px; }
+.typing .dot { width:7px; height:7px; background:#fff; border-radius:999px; opacity:0.7; transform:scale(.9); animation: blink 1s infinite; }
+.typing .dot:nth-child(2){ animation-delay:0.12s }
+.typing .dot:nth-child(3){ animation-delay:0.24s }
+
+@keyframes blink { 0%{opacity:.2; transform:translateY(0) scale(.9)} 50%{opacity:1; transform:translateY(-4px) scale(1)} 100%{opacity:.2; transform:translateY(0) scale(.9)} }
+
+@keyframes fadeInUp { from{ opacity:0; transform:translateY(6px)} to{ opacity:1; transform:none } }
+
+/* Message container tweaks to add spacing and nicer background */
+.flex-1.overflow-y-auto.p-2.space-y-3.h-full.min-h-0 {
+  background: linear-gradient(180deg, rgba(8,6,12,0.45), rgba(10,8,14,0.55));
+  padding: 20px;
+  border-radius: 12px;
+}
+
+/* Smooth transitions for bubbles */
+.bubble { transition: all .25s ease; }
+
+/* Traits panel styling (premium look) */
+:root{
+  --traits-text: #f2f2f7;
+  --traits-muted: rgba(196,196,212,1);
+  --traits-subtle:#2b2840;
+  --chip:#17152a;
+  --chip-bd:#2f2b45;
+  --accent1:#ff2d92;
+  --accent2:#ff6bc2;
+}
+.traits-panel{
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  color: var(--traits-text);
+  letter-spacing: .01em;
+  font-feature-settings: "tnum","cv01","ss01";
+}
+.traits-panel .section{
+  padding: 14px 0 8px;
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+.traits-panel .section:first-child{ border-top: 0; }
+.traits-title{
+  font-family: Outfit, Inter, sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  line-height: 1.2;
+  margin: 0 0 10px;
+  position: relative;
+}
+.traits-title::after{
+  content:"";
+  display:block;
+  height:2px; width:36px; margin-top:8px;
+  background: linear-gradient(90deg, var(--accent1), var(--accent2));
+  border-radius: 2px;
+  opacity:.9;
+}
+.traits-panel .grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+@media (max-width:560px){ .traits-panel .grid{ grid-template-columns: 1fr; } }
+.item{ display:flex; align-items:flex-start; gap:10px; }
+.icon{ width:24px; height:24px; display:grid; place-items:center; font-size:18px; line-height:1; flex:0 0 24px; transform: translateY(1px); }
+.label{ font-family: Outfit, Inter, sans-serif; font-weight:600; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color: rgba(255,255,255,.65); line-height:1.2; }
+.value{ font-weight:600; line-height:1.45; color: var(--traits-text); margin-top:2px; }
+.value.chips{ display:flex; flex-wrap:wrap; gap:8px; }
+.chip{ display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; background: var(--chip); border: 1px solid var(--chip-bd); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); font-weight:600; }
+.subhead{ font-family: Outfit, Inter, sans-serif; color: var(--accent2); font-weight:700; margin:6px 0 8px; letter-spacing:.02em; }
+
+/* Compact overrides (stack on top via .traits-panel.compact) */
+.traits-panel.compact{
+  --fs-title: 0.98rem;   /* section headings (reduced) */
+  --fs-label: 0.62rem;   /* small-caps labels (reduced) */
+  --fs-value: 0.86rem;   /* values text (reduced) */
+  --fs-chip:  0.80rem;   /* chip text (reduced) */
+
+  --ls-label: .05em;     /* letter spacing for labels */
+}
+
+.traits-panel.compact .traits-title{
+  font-size: var(--fs-title);
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+.traits-panel.compact .traits-title::after{
+  width: 24px;
+  margin-top: 6px;
+}
+
+.traits-panel.compact .label{
+  font-size: var(--fs-label);
+  letter-spacing: var(--ls-label);
+}
+
+.traits-panel.compact .value{
+  font-size: var(--fs-value);
+  line-height: 1.35;
+}
+
+.traits-panel.compact .chip{
+  font-size: var(--fs-chip);
+  padding: 4px 10px;
+  border-radius: 14px;
+}
+
+.traits-panel.compact .icon{
+  font-size: 1rem;
+  width: 18px; height: 18px;
+  transform: translateY(2px);
+}
+
+@media (max-width: 420px){
+  .traits-panel.compact{
+  --fs-title: 0.94rem;
+  --fs-value: 0.82rem;
+  --fs-chip:  0.78rem;
+  }
+}
+
+

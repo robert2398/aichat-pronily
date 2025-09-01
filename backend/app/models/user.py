@@ -36,6 +36,13 @@ class User(Base):
     user_wallet = relationship("UserWallet", back_populates="user", uselist=False)
     coin_transactions = relationship("CoinTransaction", back_populates="user")
     media_items = relationship("Media", back_populates="user")
+    # CharacterMedia relation (separate from generic Media table)
+    character_media = relationship(
+        "CharacterMedia",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 

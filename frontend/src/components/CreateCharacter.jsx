@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import CreateCharacterSave from './CreateCharacterSave';
 
 /** helpers */
 const genSample = (n, pref = "") =>
@@ -40,6 +41,8 @@ export default function CreateCharacter() {
     features: [],
   });
 
+  const [finalPayload, setFinalPayload] = useState(null);
+
   const bump = (key, val) => setState((s) => ({ ...s, [key]: val }));
   const toggleArray = (key, val) =>
     setState((s) => ({
@@ -55,11 +58,24 @@ export default function CreateCharacter() {
     []
   );
   const eyeColors = useMemo(() => ["Black", "Brown", "Red", "Yellow", "Green", "Purple", "Teal", "White"], []);
-  const hairStyles = useMemo(() => genSample(9, "Hair-"), []);
+  const hairStyles = useMemo(
+    () => ["Straight Long", "Straight Short", "Pigtails", "Hair Bun", "Ponytail"].map((x, i) => ({ id: `hair${i + 1}`, label: x })),
+    []
+  );
   const hairColors = eyeColors;
-  const bodies = useMemo(() => ["Slim", "Athletic", "Voluptuous", "Curvy", "Muscular", "Average"].map((x, i) => ({ id: `body${i}`, label: x })), []);
-  const breasts = useMemo(() => ["Flat", "Small", "Medium", "Large", "XL", "XXL"].map((x, i) => ({ id: `breast${i}`, label: x })), []);
-  const butts = useMemo(() => ["Small", "Skinny", "Athletic", "Medium", "Large", "XL"].map((x, i) => ({ id: `butt${i}`, label: x })), []);
+  // use 1-based ids so saved values like `body1`/`breast2`/`butt2` align with stored data
+  const bodies = useMemo(
+    () => ["Slim", "Athletic", "Voluptuous", "Curvy", "Muscular", "Average"].map((x, i) => ({ id: `body${i + 1}`, label: x })),
+    []
+  );
+  const breasts = useMemo(
+    () => ["Flat", "Small", "Medium", "Large", "XL", "XXL"].map((x, i) => ({ id: `breast${i + 1}`, label: x })),
+    []
+  );
+  const butts = useMemo(
+    () => ["Small", "Skinny", "Athletic", "Medium", "Large", "XL"].map((x, i) => ({ id: `butt${i + 1}`, label: x })),
+    []
+  );
   const personalities = useMemo(
     () =>
       [
@@ -72,7 +88,7 @@ export default function CreateCharacter() {
         "Lover",
         "Nympho",
         "Mean",
-      ].map((x, i) => ({ id: `pers${i}`, label: x })),
+      ].map((x, i) => ({ id: `pers${i + 1}`, label: x })),
     []
   );
   const voices = useMemo(() => ["Emotive", "Caring", "Naughty", "Flirty", "Addictive", "Dominating", "Love"], []);
@@ -174,17 +190,73 @@ export default function CreateCharacter() {
     }
   };
 
-  const next = () => setStep((v) => (isStepValid(v) ? Math.min(8, v + 1) : v));
+  const next = () => setStep((v) => (isStepValid(v) ? Math.min(9, v + 1) : v));
   const back = () => setStep((v) => Math.max(1, v - 1));
 
   // finish now navigates to a dedicated save/confirmation page (separate route)
   const finish = () => {
-    // pass current state to save page via location state
-    navigate("/create-character/save", { state: { character: state, gender } });
+    // build a cleaned payload for the save form and advance to an inline save step (9)
+    const payload = {
+      // basic selections
+      gender,
+      style: state.style,
+      ethnicity: state.ethnicity,
+      age: state.age,
+
+      // eye
+      eye_colour: state.eye,
+      eye: state.eye,
+
+      // hair
+      hair_style: labelFor(hairStyles, state.hairStyle),
+      hairStyle: state.hairStyle,
+      hair_colour: state.hairColor,
+      hairColor: state.hairColor,
+
+      // body (both id and label)
+      body_type: labelFor(bodies, state.body),
+      body: state.body,
+      breast_size: labelFor(breasts, state.breast),
+      breast: state.breast,
+      butt_size: labelFor(butts, state.butt),
+      butt: state.butt,
+
+      // genital size for male
+      dick_size: gender === 'male' ? (state.dick_size || "") : "",
+
+      // personality & voice
+      personality: labelFor(personalities, state.personality),
+      personality_id: state.personality,
+      voice_type: state.voice,
+      voice: state.voice,
+
+      // relationship
+      relationship_type: state.relationship,
+      relationship: state.relationship,
+
+      // clothing/features
+      clothing: Array.isArray(state.clothing) ? state.clothing.join(", ") : state.clothing || "",
+      clothing_array: Array.isArray(state.clothing) ? state.clothing : (state.clothing ? [state.clothing] : []),
+      special_features: Array.isArray(state.features) ? state.features.join(", ") : state.features || "",
+      features: Array.isArray(state.features) ? state.features : (state.features ? [state.features] : []),
+
+      // extras
+      enhanced_prompt: true,
+    };
+    setFinalPayload(payload);
+    // go to the inline save step instead of directly calling any backend
+    setStep(9);
   };
 
   // make the page title logical based on selected gender
   const titleTarget = gender === "female" ? "AI Girl" : gender === "male" ? "AI Boy" : "AI Person";
+
+  // helper: find a label by id from a list of {id,label}
+  const labelFor = (list, id) => {
+    if (!id) return "N/A";
+    const found = (list || []).find((x) => x.id === id);
+    return found ? found.label : id;
+  };
 
   /** small presentational wrapper */
   const StepWrapper = ({ title, children }) => (
@@ -239,7 +311,7 @@ export default function CreateCharacter() {
         {/* progress */}
         <div className="mt-6 flex justify-center">
           <nav className="inline-flex items-center gap-4" aria-label="Progress">
-            {Array.from({ length: 8 }).map((_, i) => (
+            {Array.from({ length: 9 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div
                   className={`grid h-8 w-8 place-items-center rounded-full text-sm font-semibold ${
@@ -248,7 +320,7 @@ export default function CreateCharacter() {
                 >
                   {i + 1}
                 </div>
-                {i < 7 && <div className={`h-px w-8 ${i + 1 < step ? "bg-pink-400" : "bg-white/10"}`} />}
+                {i < 8 && <div className={`h-px w-8 ${i + 1 < step ? "bg-pink-400" : "bg-white/10"}`} />}
               </div>
             ))}
           </nav>
@@ -524,7 +596,7 @@ export default function CreateCharacter() {
           </StepWrapper>
         )}
 
-        {step === 8 && (
+  {step === 8 && (
           <StepWrapper title="Summary">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="col-span-1">
@@ -539,17 +611,24 @@ export default function CreateCharacter() {
                 <div className="rounded-md bg-white/[.03] p-4">Ethnicity: {state.ethnicity || "N/A"}</div>
                 <div className="rounded-md bg-white/[.03] p-4">Age: {state.age}</div>
                 <div className="rounded-md bg-white/[.03] p-4">Eyes: {state.eye || "N/A"}</div>
-                <div className="rounded-md bg-white/[.03] p-4">Hair: {state.hairStyle || "N/A"} {state.hairColor ? `(${state.hairColor})` : ""}</div>
+                <div className="rounded-md bg-white/[.03] p-4">Hair: {labelFor(hairStyles, state.hairStyle)} {state.hairColor ? `(${state.hairColor})` : ""}</div>
                 <div className="rounded-md bg-white/[.03] p-4">Body: {state.body || "N/A"}</div>
-                {isFemaleLike && <div className="rounded-md bg-white/[.03] p-4">Breast: {state.breast || "N/A"}</div>}
-                <div className="rounded-md bg-white/[.03] p-4">Butt: {state.butt || "N/A"}</div>
-                <div className="rounded-md bg-white/[.03] p-4">Personality: {state.personality || "N/A"}</div>
+                <div className="rounded-md bg-white/[.03] p-4">Body: {labelFor(bodies, state.body)}</div>
+                {isFemaleLike && <div className="rounded-md bg-white/[.03] p-4">Breast: {labelFor(breasts, state.breast)}</div>}
+                <div className="rounded-md bg-white/[.03] p-4">Butt: {labelFor(butts, state.butt)}</div>
+                <div className="rounded-md bg-white/[.03] p-4">Personality: {labelFor(personalities, state.personality)}</div>
                 <div className="rounded-md bg-white/[.03] p-4">Voice: {state.voice || "N/A"}</div>
                 <div className="rounded-md bg-white/[.03] p-4">Clothing: {state.clothing.join(", ") || "—"}</div>
                 <div className="rounded-md bg-white/[.03] p-4">Features: {state.features.join(", ") || "—"}</div>
               </div>
             </div>
           </StepWrapper>
+        )}
+
+        {step === 9 && (
+          <div className="mt-6">
+            <CreateCharacterSave character={finalPayload} gender={gender} />
+          </div>
         )}
 
   {/* controls */}
@@ -569,14 +648,14 @@ export default function CreateCharacter() {
             >
               Next
             </button>
-          ) : (
+          ) : step === 8 ? (
             <button
               onClick={finish}
               className="rounded-xl bg-gradient-to-r from-pink-600 via-pink-400 to-indigo-500 px-6 py-3 font-semibold text-white"
             >
               ✨ Bring My AI to Life
             </button>
-          )}
+          ) : null}
         </div>
   {/* (Save page moved to its own route: /create-character/save) */}
       </div>

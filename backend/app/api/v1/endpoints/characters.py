@@ -11,9 +11,8 @@ from app.models.character import Character
 from app.models.user import User
 from app.core.config import settings
 from app.core.aws_s3 import upload_to_s3_file, get_file_from_s3_url
-from app.services.characters import generate_image_request, \
-                    build_character_prompt, \
-                    enhance_prompt, generate_username_filename
+from app.services.characters import generate_image, build_character_prompt, \
+                    enhance_prompt, generate_filename_timestamped
 from app.core.aws_s3 import generate_presigned_url
 from app.services.app_config import get_config_value_from_cache
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -61,8 +60,8 @@ async def create_character(
     print('Prompt Generated:', prompt)
     if character.enhanced_prompt:
         prompt = await enhance_prompt(prompt)
-    
-    response = await generate_image_request(prompt, num_images = 1, initial_image = None, size_orientation = "portrait")
+
+    response = await generate_image(prompt, num_images = 1, initial_image = None, size_orientation = "portrait")
     print('Image Generation Response:', response.text)
     if response.status_code == 200:
         json_resp = response.json()
@@ -89,7 +88,7 @@ async def create_character(
     # 3. Save image to S3 storage
     user_role = (user.role if user else "USER").lower()
     user_id = str(user.id)
-    username = await generate_username_filename(character.name)
+    username = await generate_filename_timestamped(character.name)
     s3_key = f"{file_type}/{user_role}/{user_id}/{username}.{file_extension}"
     bucket_name = await get_config_value_from_cache("AWS_BUCKET_NAME")
     s3_key, presigned_s3_url = await upload_to_s3_file(file_obj = image_file,

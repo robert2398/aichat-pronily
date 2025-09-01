@@ -18,6 +18,7 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: int
+    full_name: str
     role: str
     is_active: bool
     is_email_verified: bool
@@ -39,6 +40,7 @@ class LoginRequest(BaseModel):
 class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    user: UserRead
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr

@@ -42,14 +42,8 @@ async def get_all_chats(user=Depends(get_current_user), user_id: int = None, db:
             id=msg.id,
             session_id=msg.session_id,
             character_id=msg.character_id,
-            role=msg.role,
-            content_type=str(msg.content_type) if msg.content_type is not None else "",
             user_query=truncate(msg.user_query or "", 2000),
             ai_message=truncate(msg.ai_message or "", 2000),
-            audio_url_user=msg.audio_url_user,
-            audio_url_output=msg.audio_url_output,
-            duration_input=msg.duration_input,
-            duration_output=msg.duration_output,
             created_at=str(getattr(msg, "created_at", "")),
         ) for msg in messages
     ]
@@ -117,7 +111,7 @@ async def start_chat(chat: ChatCreate, user=Depends(get_current_user),
     await db.refresh(new_message)
     return JSONResponse(content={"chat_response": chat_output}, status_code=200)
 
-@router.get("/{chat_id}/messages", response_model=List[MessageRead])
+@router.get("/get-messages", response_model=List[MessageRead])
 def get_chat_messages(chat_id: int, user=Depends(get_current_user)):
     """Get paginated chat history."""
     # TODO: Implement message retrieval

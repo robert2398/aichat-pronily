@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from typing import List
 import stripe
 from app.api.v1.deps import get_db, require_admin
-from app.models.subscription import PricingPlan, PromoManagement
+from app.models.subscription import PricingPlan, PromoManagement, UserWallet
 from app.schemas.subscription import PricingPlanRead, PromoManagementRead, PromoVerifyRequest
 from app.core.config import settings
 from app.api.v1.deps import get_current_user
@@ -69,3 +69,16 @@ async def verify_promo(request: PromoVerifyRequest, user=Depends(get_current_use
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Stripe error: {str(e)}")
 
+
+@router.get("/get-user-coin")
+async def get_user_coin(user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """
+    Get the user's coin balance.
+    """
+    stmt = select(UserWallet).where(UserWallet.user_id == user.id)
+    result = await db.execute(stmt)
+    user_wallet = result.scalar_one_or_none()
+    if not user_wallet:
+        raise HTTPException(status_code=404, detail="User wallet not found")
+
+    return user_wallet

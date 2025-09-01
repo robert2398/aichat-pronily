@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
-import { PhoneCall, MoreVertical, Search, ChevronLeft, Send, ShieldCheck } from "lucide-react";
+import { PhoneCall, MoreVertical, Search, ChevronLeft, Send, ShieldCheck, Heart, MessageSquare } from "lucide-react";
 
 // prefer S3 image url, fall back to local img — keep a single source-of-truth
 const getCharacterImageUrl = (c) => {
@@ -24,12 +24,22 @@ function ChatCharacterCard({ item, onOpen }) {
             <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />
           )}
         </div>
+        {/* subtle bottom gradient for legibility */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/45 pointer-events-none" />
         <div className="absolute left-3 right-3 bottom-3 p-0">
           <div className="px-3 pb-2">
             <p className="text-white text-sm font-semibold drop-shadow-md">{item.name}</p>
-            <p className="text-white/60 text-xs mt-1 drop-shadow-sm">
-              {item.age} • {item.desc}
-            </p>
+            <p className="text-white/60 text-xs mt-1 drop-shadow-sm">{item.age} • {item.desc}</p>
+            <div className="mt-2 flex items-center gap-3 text-xs">
+              <span className="inline-flex items-center gap-2 text-pink-300">
+                <Heart className="h-3.5 w-3.5 text-pink-400" aria-hidden />
+                {item.likes ?? "1M"}
+              </span>
+              <span className="inline-flex items-center gap-2 text-pink-300">
+                <MessageSquare className="h-3.5 w-3.5" aria-hidden />
+                {item.messages ?? "1M"}
+              </span>
+            </div>
           </div>
         </div>
       </button>
@@ -46,7 +56,6 @@ export default function AiChat() {
   const [loadingChars, setLoadingChars] = useState(false);
   const [charsError, setCharsError] = useState(null);
   const [source, setSource] = useState("Default"); // "Default" | "My AI"
-  const [sourceOpen, setSourceOpen] = useState(false);
 
   // image cache key and helpers (presigned urls have ~10h validity)
   const IMAGE_CACHE_KEY = "pronily:characters:image_cache";
@@ -90,6 +99,10 @@ export default function AiChat() {
   const [messages, setMessages] = useState([]);
   const [text, setText] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [galleryItems, setGalleryItems] = useState([]);
+  const [showAllGallery, setShowAllGallery] = useState(false);
+  const [galleryFetchStatus, setGalleryFetchStatus] = useState("");
+  const [galleryFetchUrl, setGalleryFetchUrl] = useState("");
 
   // Session id management: keep a stable id for the lifetime of the page/tab
   const ensureSessionId = (characterId) => {
@@ -141,6 +154,98 @@ export default function AiChat() {
   const endRef = useRef(null);
   const mainRef = useRef(null);
   const composerRef = useRef(null);
+
+  // Date/time helpers for WhatsApp-style grouping
+  const toDate = (v) => {
+    try { return v ? new Date(v) : new Date(); } catch (e) { return new Date(); }
+  };
+
+  const getDayKey = (date) => {
+    const d = toDate(date);
+    return d.toISOString().slice(0,10); // YYYY-MM-DD
+  };
+
+  const isOlderThanWeek = (date) => {
+    const d = toDate(date);
+    return (Date.now() - d.getTime()) > 7 * 24 * 60 * 60 * 1000;
+  };
+
+  const formatDayLabel = (date) => {
+    const d = toDate(date);
+    if (isOlderThanWeek(d)) return d.toLocaleDateString();
+    return d.toLocaleDateString(undefined, { weekday: 'long' });
+  };
+
+  const formatTime = (date) => {
+    const d = toDate(date);
+    return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit', hour12: true });
+  };
+
+  // Message bubble helper component
+  function MessageBubble({ m }) {
+    const bubbleRef = useRef(null);
+    const timeRef = useRef(null);
+
+    useEffect(() => {
+      const elTime = timeRef.current;
+      const elBubble = bubbleRef.current;
+      if (!elTime || !elBubble) return;
+
+      const setVar = (w) => {
+        try { elBubble.style.setProperty('--tsw', `${Math.ceil(w)}px`); } catch (e) {}
+      };
+
+      // initialize
+      setVar(elTime.getBoundingClientRect().width || elTime.offsetWidth || 0);
+
+      let ro = null;
+      try {
+        ro = new ResizeObserver((entries) => {
+          for (const e of entries) {
+            const w = e.contentRect?.width || 0;
+            // small padding buffer so time doesn't touch text
+            setVar(w + 6);
+          }
+        });
+        ro.observe(elTime);
+      } catch (e) {
+        // ResizeObserver not supported
+        const onResize = () => setVar(elTime.offsetWidth || 0);
+        window.addEventListener('resize', onResize);
+        return () => window.removeEventListener('resize', onResize);
+      }
+
+      const onWin = () => setVar(elTime.getBoundingClientRect().width || elTime.offsetWidth || 0);
+      window.addEventListener('resize', onWin);
+
+      return () => {
+        try { if (ro && elTime) ro.unobserve(elTime); } catch (e) {}
+        try { window.removeEventListener('resize', onWin); } catch (e) {}
+      };
+    }, [m.time, m.text]);
+
+    return (
+      <div ref={bubbleRef} className={`bubble max-w-[75%] relative`} style={{'--tsw': '0px'}}>
+        <div className="text-sm whitespace-pre-wrap break-words">
+          {typeof m.text === 'string' ? (
+            m.text.split(/(\*[^*]+\*)/g).map((part, i) => {
+              if (/^\*.+\*$/.test(part)) return <em key={i}>{part.replace(/\*/g, '')}</em>;
+              return <span key={i}>{part}</span>;
+            })
+          ) : (
+            m.text
+          )}
+          {/* inline spacer only affects the last line because it's inline-block */}
+          <span className="inline-block" style={{ width: 'var(--tsw)' }} aria-hidden />
+        </div>
+
+        {/* absolutely positioned time sits bottom-right inside bubble; never wraps */}
+        <time ref={timeRef} className="message-time absolute right-3 bottom-2 text-[11px] text-white/60 whitespace-nowrap">
+          {m.time ? formatTime(m.time) : ''}
+        </time>
+      </div>
+    );
+  }
 
   // Track whether user is near bottom so we don't yank scroll when they scroll up
   const userAtBottomRef = useRef(true);
@@ -246,6 +351,137 @@ export default function AiChat() {
     };
   }, [id]);
 
+  // Gallery fetching: extracted function so we can log, force-refresh, and listen to reload events
+  const fetchGallery = async (opts = { force: false }) => {
+    const CACHE_KEY = 'pronily:gallery:cache';
+    const CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours
+
+    try {
+      if (!opts.force) {
+        // Try cache first
+        try {
+          const raw = localStorage.getItem(CACHE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.expiresAt && Number(parsed.expiresAt) > Date.now() && Array.isArray(parsed.items)) {
+              // cache hit
+              const all = parsed.items;
+              const filtered = selectedSafe?.id ? all.filter((it) => String(it.character_id) === String(selectedSafe.id)) : all;
+              setGalleryItems(filtered || []);
+              console.debug('AiChat: gallery - cache hit, using cached items', filtered?.length ?? 0);
+              return;
+            }
+          }
+        } catch (e) {
+          console.debug('AiChat: gallery - cache read/parse failed', e);
+        }
+      } else {
+        console.debug('AiChat: gallery - force refresh requested');
+      }
+
+      // Determine base URL (fall back to origin + /api/v1 when VITE var not set)
+      const envBase = import.meta.env.VITE_API_BASE_URL;
+      const base = envBase || (typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : '');
+      if (!base) {
+        console.debug('AiChat: gallery - no base URL available, skipping fetch');
+        return;
+      }
+
+      // Choose endpoint based on source: Default uses media endpoint; My AI must use fetch-loggedin-user
+      let url = '';
+      const headers = { 'Content-Type': 'application/json' };
+      if (source === 'Default') {
+        url = `${base.replace(/\/$/, '')}/characters/media/get-default-character-images`;
+        console.debug('AiChat: gallery - fetching (media)', url);
+        try { setGalleryFetchUrl(url); setGalleryFetchStatus('loading'); } catch (e) {}
+        // public or token-provided access allowed for media
+        const stored = localStorage.getItem('pronily:auth:token');
+        if (stored) {
+          const tokenOnly = stored.replace(/^bearer\s+/i, '').trim();
+          headers['Authorization'] = `bearer ${tokenOnly}`;
+        } else if (import.meta.env.VITE_API_AUTH_TOKEN) {
+          headers['Authorization'] = import.meta.env.VITE_API_AUTH_TOKEN;
+        }
+      } else {
+        // My AI: call the logged-in characters endpoint and pass the user's token
+        const stored = localStorage.getItem('pronily:auth:token');
+        if (!stored) {
+          console.debug('AiChat: gallery - My AI requested but no auth token');
+          setGalleryFetchStatus('no-auth');
+          return;
+        }
+        url = `${base.replace(/\/$/, '')}/characters/fetch-loggedin-user`;
+        console.debug('AiChat: gallery - fetching (loggedin characters)', url);
+        const tokenOnly = stored.replace(/^bearer\s+/i, '').trim();
+        headers['Authorization'] = `bearer ${tokenOnly}`;
+      }
+
+      const res = await fetch(url, { headers });
+      console.debug('AiChat: gallery - fetch response', res && res.status);
+      if (!res.ok) {
+        console.debug('AiChat: gallery - fetch not ok', res.status);
+        try { setGalleryFetchStatus(`error ${res.status}`); } catch (e) {}
+        return;
+      }
+      const json = await res.json();
+      // For media endpoint expect images array; for loggedin-user expect characters list
+      let items = [];
+      if (source === 'Default') {
+        items = json.images || json.data || [];
+      } else {
+        // map characters into a gallery-like items array with character_id and image fields
+        const chars = Array.isArray(json) ? json : (json.characters || json.data || []);
+        items = (chars || []).map((c) => ({
+          id: c.id,
+          character_id: c.id,
+          image_url_s3: c.image_url_s3 || c.image_url || c.img || '',
+          url: c.image_url_s3 || c.image_url || c.img || '',
+        }));
+      }
+      const filtered = selectedSafe?.id ? items.filter((it) => String(it.character_id) === String(selectedSafe.id)) : items;
+  setGalleryItems(filtered || []);
+  try { setGalleryFetchStatus('ok'); } catch (e) {}
+
+      try {
+        const payload = { items, expiresAt: Date.now() + CACHE_TTL };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        console.debug('AiChat: gallery - cache write failed', e);
+      }
+    } catch (e) {
+      console.debug('AiChat: gallery - unexpected error', e);
+      try { setGalleryFetchStatus('error'); } catch (e2) {}
+    }
+  };
+
+  // call on selected change, and listen for external reload triggers
+  useEffect(() => {
+    let cancelled = false;
+    // small wrapper respects cancellation
+    const run = async () => {
+      if (cancelled) return;
+      console.debug('AiChat: gallery effect triggered for selectedSafe.id', selectedSafe?.id);
+      await fetchGallery({ force: true });
+    };
+    run();
+
+    const onReload = () => {
+      // force refresh when external code dispatches 'gallery:reload'
+      fetchGallery({ force: true });
+    };
+    try { window.addEventListener('gallery:reload', onReload); } catch (e) {}
+
+    return () => { cancelled = true; try { window.removeEventListener('gallery:reload', onReload); } catch (e) {} };
+  }, [selectedSafe?.id]);
+
+  // Also ensure gallery fetch runs when route id is present (covers cases where selectedSafe may be delayed)
+  useEffect(() => {
+  if (!id) return;
+  console.debug('AiChat: gallery effect triggered for route id', id);
+  // force a network fetch when opening a chat to ensure API is called
+  fetchGallery({ force: true });
+  }, [id]);
+
   // Observe composer size to keep padding tight
   useEffect(() => {
     if (!composerRef.current) return;
@@ -280,17 +516,74 @@ export default function AiChat() {
     };
   }, [id]);
 
-  // Reset chat when switching character so each character starts fresh
+  // Load chat history when switching character (or reset if none)
   useEffect(() => {
-    // Only run when id changes to a real value
     if (!id) return;
-    setMessages([]);
-    setText("");
-    try {
-      userAtBottomRef.current = true;
-    } catch (e) {}
-    // ensure scroll position is reset
-    setTimeout(() => scrollToBottom(true), 30);
+    let cancelled = false;
+    const loadHistory = async () => {
+      setMessages([]);
+      setText("");
+      try {
+        userAtBottomRef.current = true;
+      } catch (e) {}
+
+      const envBase = import.meta.env.VITE_API_BASE_URL;
+      const base = envBase || (typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : '');
+      if (!base) {
+        // no backend configured; nothing to load
+        setTimeout(() => scrollToBottom(true), 30);
+        return;
+      }
+
+      try {
+        const url = `${base.replace(/\/$/, '')}/chats/all`;
+        const opts = { method: 'GET', headers: { 'Content-Type': 'application/json' } };
+        const stored = localStorage.getItem('pronily:auth:token');
+        if (stored) {
+          const tokenOnly = stored.replace(/^bearer\s+/i, '').trim();
+          opts.headers['Authorization'] = `bearer ${tokenOnly}`;
+        }
+
+        const res = await fetch(url, opts);
+        if (!res.ok) {
+          // fallback to empty messages but don't throw UI-breaking error
+          setMessages([]);
+          setTimeout(() => scrollToBottom(true), 30);
+          return;
+        }
+
+        const data = await res.json();
+        if (cancelled) return;
+        // filter messages for this character id and map to local message shape
+        const charId = Number(id);
+        const filtered = (Array.isArray(data) ? data : []).filter((r) => Number(r.character_id) === charId);
+        // sort ascending by created_at so older messages come first
+        filtered.sort((a,b) => new Date(a.created_at) - new Date(b.created_at));
+
+        const mapped = [];
+        for (const row of filtered) {
+          // user's message
+          if (row.user_query && row.user_query.trim()) {
+            mapped.push({ id: `u_${row.id}`, from: 'me', text: row.user_query, time: new Date(row.created_at).toISOString() });
+          }
+          // ai message
+          if (row.ai_message && row.ai_message.trim()) {
+            mapped.push({ id: `a_${row.id}`, from: 'them', text: row.ai_message, time: new Date(row.created_at).toISOString() });
+          }
+        }
+
+        setMessages(mapped);
+        // scroll to bottom after render
+        setTimeout(() => scrollToBottom(true), 50);
+      } catch (err) {
+        // On error, keep messages empty but don't break the app
+        setMessages([]);
+        setTimeout(() => scrollToBottom(true), 30);
+      }
+    };
+
+    loadHistory();
+    return () => { cancelled = true; };
   }, [id]);
 
   // Hide footer & lock outer scroll while chat is open
@@ -323,8 +616,8 @@ export default function AiChat() {
       return;
     }
     if (isSending) return; // prevent duplicate
-  // optimistic add user message
-  const userMsg = { id: Date.now(), from: "me", text: text.trim(), time: "Now" };
+  // optimistic add user message (use ISO timestamp)
+  const userMsg = { id: Date.now(), from: "me", text: text.trim(), time: new Date().toISOString() };
   setMessages((m) => [...m, userMsg]);
   // user just sent a message — force scroll to show it
   setTimeout(() => scrollToBottom(true), 25);
@@ -364,11 +657,11 @@ export default function AiChat() {
   // Prefer explicit backend field `chat_response`, then fall back to other common keys
   const aiText = data?.chat_response || data?.reply || data?.ai_response || data?.message || (data?.choices && (data.choices[0]?.message?.content || data.choices[0]?.text)) || (typeof data === 'string' ? data : JSON.stringify(data));
 
-  setMessages((m) => [...m, { id: Date.now() + 2, from: "them", text: aiText || "(no response)", time: "Now" }]);
+  setMessages((m) => [...m, { id: Date.now() + 2, from: "them", text: aiText || "(no response)", time: new Date().toISOString() }]);
   // only auto-scroll if user was near bottom
   setTimeout(() => scrollToBottom(false), 25);
       } catch (err) {
-  setMessages((m) => [...m, { id: Date.now() + 3, from: "them", text: `Error: ${err.message || String(err)}`, time: "" }]);
+  setMessages((m) => [...m, { id: Date.now() + 3, from: "them", text: `Error: ${err.message || String(err)}`, time: new Date().toISOString() }]);
   setTimeout(() => scrollToBottom(false), 25);
       } finally {
         setIsSending(false);
@@ -383,27 +676,32 @@ export default function AiChat() {
       setLoadingChars(true);
       setCharsError(null);
       try {
-        const base = import.meta.env.VITE_API_BASE_URL;
+        // compute base URL with fallback
+        const envBase = import.meta.env.VITE_API_BASE_URL;
+        const base = envBase || (typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : '');
+        if (!base) {
+          setCharsError('No API base configured');
+          setCharacters([]);
+          setLoadingChars(false);
+          return;
+        }
+
         let url = "";
-        const opts = { method: "GET", headers: {} };
-        if (source === "Default") {
-          url = `${base}/characters/fetch-default`;
+        const opts = { method: 'GET', headers: {} };
+        if (source === 'Default') {
+          url = `${base.replace(/\/$/, '')}/characters/fetch-default`;
         } else {
           // My AI: requires access token
-          url = `${base}/characters/fetch-loggedin-user`;
-          const stored = localStorage.getItem("pronily:auth:token");
+          const stored = localStorage.getItem('pronily:auth:token');
           if (!stored) {
-            // redirect to signin so user can provide token
-            setCharsError("You must sign in to view your characters.");
-            setCharacters([]);
-            setLoadingChars(false);
+            // No auth token - prompt sign-in. Do NOT set an error or clear the characters
+            // so the default characters stay visible if the user cancels sign-in.
             navigate('/signin', { state: { background: location } });
             return;
           }
-          // Exactly mirror CreateCharacterSave: strip any leading bearer and send lowercase 'bearer'
-          const tokenOnly = stored.replace(/^bearer\s+/i, "").trim();
-          const authHeader = `bearer ${tokenOnly}`;
-          opts.headers["Authorization"] = authHeader;
+          url = `${base.replace(/\/$/, '')}/characters/fetch-loggedin-user`;
+          const tokenOnly = stored.replace(/^bearer\s+/i, '').trim();
+          opts.headers['Authorization'] = `bearer ${tokenOnly}`;
         }
 
         const res = await fetch(url, opts);
@@ -416,9 +714,9 @@ export default function AiChat() {
         // map backend shape to UI-friendly fields
         const mapped = (Array.isArray(data) ? data : []).map((d) => {
           // prefer cached presigned url if available and not expired
-          const rawUrl = d.image_url_s3 || d.image_url || "";
+          const rawUrl = d.image_url_s3 || d.image_url || '';
           const cached = rawUrl ? getCachedImage(d.id) : null;
-          const finalUrl = cached || rawUrl || "";
+          const finalUrl = cached || rawUrl || '';
           if (rawUrl && !cached) {
             // store in cache with ttl
             setCachedImage(d.id, rawUrl);
@@ -426,11 +724,11 @@ export default function AiChat() {
           return {
             id: d.id,
             name: d.name || d.username,
-            age: d.age || "",
-            desc: d.bio || "",
+            age: d.age || '',
+            desc: d.bio || '',
             img: finalUrl,
-            bio: d.bio || "",
-            image_url_s3: d.image_url_s3 || "",
+            bio: d.bio || '',
+            image_url_s3: d.image_url_s3 || '',
           };
         });
         setCharacters(mapped);
@@ -479,22 +777,30 @@ export default function AiChat() {
             </div>
 
             <div className="flex items-center gap-3">
-              {/* Styled dropdown for Source */}
-              <div className="relative">
+              {/* Pill-style switch for Source (Default / My AI) */}
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/[.03] p-1 border border-white/10">
                 <button
-                  onClick={() => setSourceOpen((v) => !v)}
-                  className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm text-white bg-white/[.03] border border-white/10 hover:bg-white/5 focus:outline-none"
-                  aria-haspopup="true"
+                  type="button"
+                  onClick={() => setSource('Default')}
+                  className={`h-9 px-4 min-w-[7rem] text-sm rounded-full text-center font-medium flex items-center justify-center transition-colors ${source === 'Default' ? 'bg-pink-500 text-white shadow' : 'text-white/90 hover:bg-white/5'}`}
                 >
-                  <span className="px-1">{source}</span>
-                  <svg className="w-4 h-4 text-white/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 9l6 6 6-6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  Default
                 </button>
-                {sourceOpen && (
-                  <div className="absolute left-1/2 -translate-x-1/2 mt-2 min-w-[10rem] rounded-xl bg-[#0b0710] border border-white/6 shadow-lg z-50">
-                    <button onClick={() => { setSource('Default'); setSourceOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-white/90 hover:bg-white/5 rounded-t-xl">Default</button>
-                    <button onClick={() => { setSource('My AI'); setSourceOpen(false); }} className="w-full text-left px-4 py-3 text-sm text-white/90 hover:bg-white/5 rounded-b-xl">My AI</button>
-                  </div>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                      const stored = localStorage.getItem('pronily:auth:token');
+                      if (!stored) {
+                        // Prompt sign-in without setting an error so default characters remain visible.
+                        navigate('/signin', { state: { background: location } });
+                        return;
+                      }
+                      setSource('My AI');
+                    }}
+                  className={`h-9 px-4 min-w-[7rem] text-sm rounded-full text-center font-medium flex items-center justify-center transition-colors ${source === 'My AI' ? 'bg-pink-500 text-white shadow' : 'text-white/90 hover:bg-white/5'}`}
+                >
+                  My AI
+                </button>
               </div>
 
               <button
@@ -560,6 +866,7 @@ export default function AiChat() {
                   />
                   <Search className="absolute right-3 top-2.5 w-4 h-4 text-white/50" />
                 </div>
+                
               </div>
             </div>
 
@@ -618,17 +925,74 @@ export default function AiChat() {
               className="flex-1 overflow-y-auto p-2 space-y-3 h-full min-h-0"
               style={{ paddingBottom: 'var(--composer-h, 64px)' }}
             >
-              {messages.map((m) => (
-                <div
-                  key={m.id}
-                  className={`max-w-[70%] p-3 rounded-lg ${
-                    m.from === "me" ? "ml-auto bg-pink-600 text-white" : "bg-white/[.03] text-white/85"
-                  }`}
-                >
-                  <div className="text-sm">{m.text}</div>
-                  <div className="text-xs text-white/50 mt-1">{m.time}</div>
+              {(() => {
+                // Group messages by day key
+                const groups = [];
+                let lastKey = null;
+                for (const m of messages) {
+                  const key = getDayKey(m.time || new Date().toISOString());
+                  if (key !== lastKey) {
+                    groups.push({ type: 'day', key, time: m.time });
+                    lastKey = key;
+                  }
+                  groups.push({ type: 'msg', msg: m });
+                }
+
+                return groups.map((item, idx) => {
+                  if (item.type === 'day') {
+                    return (
+                      <div key={`day-${item.key}-${idx}`} className="flex items-center justify-center">
+                        <div className="px-3 py-1 rounded-full bg-white/[.04] text-xs text-white/70">{formatDayLabel(item.time)}</div>
+                      </div>
+                    );
+                  }
+                  const m = item.msg;
+                  return (
+                    <div key={m.id} className={`message-wrapper ${m.from === 'me' ? 'message-user' : 'message-ai'}`}>
+                      {m.from !== 'me' && (
+                        <div className="avatar" title={selectedSafe.name}>
+                          {(selectedSafe.image_url_s3 || selectedSafe.img) ? (
+                            <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={selectedSafe.name} />
+                          ) : (
+                            <div className="avatar-initials">{(selectedSafe.name || 'AI').slice(0,2).toUpperCase()}</div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="message-inner">
+                        <MessageBubble m={m} />
+                      </div>
+
+                      {m.from === 'me' && (
+                        <div className="avatar" title="You">
+                          <div className="avatar-initials">You</div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+
+              {/* typing indicator when AI is replying */}
+              {isSending && (
+                <div className="message-wrapper message-ai">
+                  <div className="avatar">
+                    {(selectedSafe.image_url_s3 || selectedSafe.img) ? (
+                      <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={selectedSafe.name} />
+                    ) : (
+                      <div className="avatar-initials">AI</div>
+                    )}
+                  </div>
+                  <div className="message-inner">
+                    <div className="bubble typing" aria-hidden>
+                      <div className="dot" />
+                      <div className="dot" />
+                      <div className="dot" />
+                    </div>
+                  </div>
                 </div>
-              ))}
+              )}
+
               <div ref={endRef} aria-hidden style={{ height: 8 }} />
             </div>
 
@@ -700,111 +1064,135 @@ export default function AiChat() {
 </div>
 
             {/* description */}
-            <p className="text-sm text-white/70 mb-4">{selectedSafe.bio || 'Avatara is loving and empathetic, she loves playing with cats and dancing.'}</p>
+            <div className="traits-panel compact">
+              <p className="text-sm text-white/70 mb-4">{selectedSafe.bio || 'Avatara is loving and empathetic, she loves playing with cats and dancing.'}</p>
 
-            {/* Generate image */}
-            <button onClick={() => navigate(`/ai-image?character=${selectedSafe.id}`)} className="w-full rounded-xl px-6 py-3 text-base font-semibold text-white bg-gradient-to-r from-pink-500 via-pink-400 to-indigo-500 shadow mb-4">✨ Generate image</button>
+              {/* Generate image */}
+              <button onClick={() => {
+                try { localStorage.setItem('pronily:image:selectedCharacter', JSON.stringify(selectedSafe)); } catch (e) {}
+                // mark that we're coming from a selection flow so the form reads persisted selection
+                navigate('/ai-porn/image', { state: { fromSelect: true } });
+              }} className="w-full rounded-xl px-6 py-3 text-base font-semibold text-white bg-gradient-to-r from-pink-500 via-pink-400 to-indigo-500 shadow mb-4">✨ Generate image</button>
 
-            {/* Gallery */}
-            <div className="mb-4">
-              <div className="text-sm font-medium text-pink-400 mb-2">Gallery</div>
-              <div className="grid grid-cols-3 gap-2">
-                {[0,1,2].map((i) => (
-                  <div key={i} className="relative h-16 w-full rounded-lg overflow-hidden bg-white/[.02]">
-                    {(selectedSafe.image_url_s3 || selectedSafe.img) ? (
-                      <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={`thumb-${i}`} className="w-full h-full object-cover object-top" />
-                    ) : (
-                      <div className="w-full h-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.16),rgba(255,255,255,0)_70%)]" />
-                    )}
-                    {i === 2 && (
-                      <div className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs font-medium">View More</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Details */}
-            <div className="mb-4">
-              <div className="text-[10px] font-medium text-white/80 mb-2">Details</div>
-              <div className="grid grid-cols-2 gap-1">
-                <div className="flex items-center gap-2 text-[10px]">
-                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">👤</div>
-                  <div>
-                    <div className="text-[8px] text-white/60">BODY</div>
-                    <div className="text-white text-[10px]">Fit</div>
-                  </div>
+              {/* Gallery */}
+              <div className="mb-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-sm font-medium text-pink-400">Gallery</div>
+                  <div className="text-xs text-white/50">{(galleryFetchStatus && galleryFetchStatus !== 'ok') ? `Status: ${galleryFetchStatus}` : ''}</div>
                 </div>
-                <div className="flex items-center gap-2 text-[10px]">
-                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">🌍</div>
-                  <div>
-                    <div className="text-[8px] text-white/60">ETHNICITY</div>
-                    <div className="text-white text-[10px]">Caucasian</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-[10px]">
-                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">👁️</div>
-                  <div>
-                    <div className="text-[8px] text-white/60">EYE</div>
-                    <div className="text-white text-[10px]">Green</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-[10px]">
-                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">💇</div>
-                  <div>
-                    <div className="text-[8px] text-white/60">HAIR</div>
-                    <div className="text-white text-[10px]">Brown, Straight</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-[10px]">
-                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">🍒</div>
-                  <div>
-                    <div className="text-[8px] text-white/60">BREAST</div>
-                    <div className="text-white text-[10px]">Big</div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-[10px]">
-                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">🍑</div>
-                  <div>
-                    <div className="text-[8px] text-white/60">BUTT</div>
-                    <div className="text-white text-[10px]">Big</div>
-                  </div>
+                <div className="grid grid-cols-3 gap-2">
+                  {(galleryItems && galleryItems.length > 0 ? (showAllGallery ? galleryItems : galleryItems.slice(0,4)) : []).map((it, idx) => (
+                    <div key={it.id || idx} className="relative h-16 w-full rounded-lg overflow-hidden bg-white/[.02]">
+                        { (it.media_type && String(it.media_type).toLowerCase().startsWith('video')) ? (
+                          <video src={it.s3_path_gallery || it.url || it.image_url_s3 || it.image_url || it.img || it.file || it.media_url} className="w-full h-full object-cover object-top" controls muted preload="none" />
+                        ) : (
+                          (it.s3_path_gallery || it.url || it.image_url_s3 || it.image_url || it.img || it.file || it.media_url) ? (
+                            <img src={it.s3_path_gallery || it.url || it.image_url_s3 || it.image_url || it.img || it.file || it.media_url} alt={`thumb-${idx}`} className="w-full h-full object-cover object-top" loading="lazy" />
+                          ) : (
+                            <div className="w-full h-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.16),rgba(255,255,255,0)_70%)]" />
+                          )
+                        )}
+                      {/* overlay for first visible when collapsed */}
+                      {!showAllGallery && idx === Math.min(3, (galleryItems.length-1)) && galleryItems.length > 4 && (
+                        <button onClick={() => setShowAllGallery(true)} className="absolute inset-0 bg-black/50 flex items-center justify-center text-white text-xs font-medium">View More</button>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
-            </div>
 
-            {/* Her Traits */}
-            <div>
-              <div className="text-[10px] font-medium text-pink-400 mb-2">Her Traits</div>
-              <div className="grid grid-cols-2 gap-1">
-                {/* First row: Personality and Occupation */}
-                <div className="flex items-center gap-2 text-[10px]">
-                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">🧠</div>
-                  <div>
-                    <div className="text-[8px] text-white/60">PERSONALITY</div>
-                    <div className="text-white text-[10px]">Lover</div>
+              {/* Details */}
+              <div className="section">
+                <div className="traits-title">Details</div>
+                <div className="grid">
+                  <div className="item">
+                    <div className="icon">👤</div>
+                    <div>
+                      <div className="label">Body</div>
+                      <div className="value chips"><span className="chip">Fit</span></div>
+                    </div>
+                  </div>
+
+                  <div className="item">
+                    <div className="icon">🌍</div>
+                    <div>
+                      <div className="label">Ethnicity</div>
+                      <div className="value chips"><span className="chip">Caucasian</span></div>
+                    </div>
+                  </div>
+
+                  <div className="item">
+                    <div className="icon">👁️</div>
+                    <div>
+                      <div className="label">Eye</div>
+                      <div className="value chips"><span className="chip">Green</span></div>
+                    </div>
+                  </div>
+
+                  <div className="item">
+                    <div className="icon">💇</div>
+                    <div>
+                      <div className="label">Hair</div>
+                      <div className="value chips"><span className="chip">Brown</span><span className="chip">Straight</span></div>
+                    </div>
+                  </div>
+
+                  <div className="item">
+                    <div className="icon">🍒</div>
+                    <div>
+                      <div className="label">Breast</div>
+                      <div className="value chips"><span className="chip">Big</span></div>
+                    </div>
+                  </div>
+
+                  <div className="item">
+                    <div className="icon">🍑</div>
+                    <div>
+                      <div className="label">Butt</div>
+                      <div className="value chips"><span className="chip">Big</span></div>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 text-[10px]">
-                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">🎭</div>
-                  <div>
-                    <div className="text-[8px] text-white/60">OCCUPATION</div>
-                    <div className="text-white text-[10px]">Actress</div>
+              </div>
+
+              {/* Her Traits */}
+              <div className="section">
+                <div className="traits-title">Her Traits</div>
+                <div className="grid">
+                  <div className="item">
+                    <div className="icon">🧠</div>
+                    <div>
+                      <div className="label">Personality</div>
+                      <div className="value chips"><span className="chip">Lover</span></div>
+                    </div>
                   </div>
-                </div>
-                {/* Second row: Hobbies and Relationship */}
-                <div className="flex items-start gap-2 text-[10px] col-span-2">
-                  <div className="w-4 h-4 flex items-center justify-center text-[8px] flex-shrink-0 mt-0.5">🎨</div>
-                  <div>
-                    <div className="text-[8px] text-white/60">HOBBIES</div>
-                    <div className="text-white text-[10px] leading-tight">Ambitious, Empathetic, Caring, Writing Poetry, Bird Watching</div>
+
+                  <div className="item">
+                    <div className="icon">🎭</div>
+                    <div>
+                      <div className="label">Occupation</div>
+                      <div className="value chips"><span className="chip">Actress</span></div>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 text-[10px] col-span-2">
-                  <div className="w-4 h-4 flex items-center justify-center text-[8px]">💖</div>
-                  <div>
-                    <div className="text-[8px] text-white/60">RELATIONSHIP</div>
-                    <div className="text-white text-[10px]">Stranger</div>
+
+                  <div className="item" style={{ gridColumn: '1 / -1' }}>
+                    <div className="icon">🎨</div>
+                    <div>
+                      <div className="label">Hobbies</div>
+                      <div className="value chips">
+                        {['Ambitious','Empathetic','Caring','Writing Poetry','Bird Watching'].map((h) => (
+                          <span key={h} className="chip">{h}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="item" style={{ gridColumn: '1 / -1' }}>
+                    <div className="icon">💖</div>
+                    <div>
+                      <div className="label">Relationship</div>
+                      <div className="value chips"><span className="chip">Stranger</span></div>
+                    </div>
                   </div>
                 </div>
               </div>

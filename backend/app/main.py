@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 #from app.api.v1 import deps
-from app.api.v1.endpoints import auth, characters, chats, \
+from app.api.v1.endpoints import auth, characters, chats, character_media, \
             analytics, password_reset, subscription, voice, pricing_promo
 from app.api.v1.endpoints.admin import model_management, user_management, app_config_management, \
             character_management, pricing_promo_management, dashboard
@@ -45,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
     app.include_router(password_reset.router, prefix="/api/v1/auth", tags=["auth"])
     app.include_router(characters.router, prefix="/api/v1/characters", tags=["characters"])
+    app.include_router(character_media.router, prefix="/api/v1/characters/media", tags=["characters"])
     app.include_router(chats.router, prefix="/api/v1/chats", tags=["chats"])
     app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
     app.include_router(subscription.router, prefix="/api/v1/subscription", tags=["stripe"])

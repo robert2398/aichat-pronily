@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import PrimaryButton from "../auth/PrimaryButton";
 
 // ---- inline icons (kept lightweight & themeable) ----
@@ -55,6 +55,7 @@ function Pill({ active, children, onClick, className = "" }) {
 
 export default function AiPornVideo() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   // selections (scoped to video)
   const [character, setCharacter] = useState(null);
@@ -68,20 +69,96 @@ export default function AiPornVideo() {
   const [lengthSec, setLengthSec] = useState(5); // 5 | 10
   const [speedBoost, setSpeedBoost] = useState(true);
 
-  // read persisted selections if present
+  // read persisted selections if present; respect navigation state from SelectCharacter
   useEffect(() => {
+    const fromSelect = location && location.state && location.state.fromSelect;
+    console.log('AiPornVideo mounted, fromSelect=', fromSelect);
     try {
       const c = localStorage.getItem("pronily:video:selectedCharacter");
+      console.log('AiPornVideo: read selectedCharacter raw=', c);
       if (c) setCharacter(JSON.parse(c));
+      else if (!fromSelect) setCharacter(null);
     } catch {}
     try {
       const p = localStorage.getItem("pronily:video:selectedPose");
+      console.log('AiPornVideo: read selectedPose raw=', p);
       if (p) setPose(JSON.parse(p));
+      else if (!fromSelect) setPose(null);
     } catch {}
     try {
       const v = localStorage.getItem("pronily:video:selectedSource");
+      console.log('AiPornVideo: read selectedSource raw=', v);
       if (v) setVideoSrc(JSON.parse(v));
+      else if (!fromSelect) setVideoSrc(null);
     } catch {}
+  }, [location]);
+
+  // Ensure selected character has an image URL; fetch backend list and patch if missing
+  useEffect(() => {
+    const ensureImage = async (ch) => {
+      try {
+        if (!ch || ch.img) return;
+        const base = import.meta.env.VITE_API_BASE_URL;
+        if (!base) return;
+        const url = `${base.replace(/\/$/, "")}/characters/fetch-default`;
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        const found = (Array.isArray(data) ? data : []).find((d) => String(d.id) === String(ch.id));
+        if (found) {
+          const rawUrl = found.image_url_s3 || found.image_url || "";
+          const finalUrl = rawUrl || "";
+          const patched = { ...ch, img: finalUrl };
+          setCharacter(patched);
+          try { localStorage.setItem('pronily:video:selectedCharacter', JSON.stringify(patched)); } catch (e) {}
+        }
+      } catch (e) {}
+    };
+
+    try {
+      const raw = localStorage.getItem("pronily:video:selectedCharacter");
+      if (raw) {
+        const ch = JSON.parse(raw);
+        ensureImage(ch);
+      }
+    } catch (e) {}
+  }, []);
+
+  // also run when character changes
+  useEffect(() => {
+    if (character && !character.img) {
+      useEffect(() => {
+        const fromSelect = location && location.state && location.state.fromSelect;
+        console.log('AiPornVideo mounted, fromSelect=', fromSelect);
+        if (fromSelect) {
+          try {
+            const c = localStorage.getItem("pronily:video:selectedCharacter");
+            console.log('AiPornVideo: read selectedCharacter raw=', c);
+            if (c) setCharacter(JSON.parse(c));
+          } catch {}
+          try {
+            const p = localStorage.getItem("pronily:video:selectedPose");
+            console.log('AiPornVideo: read selectedPose raw=', p);
+            if (p) setPose(JSON.parse(p));
+          } catch {}
+          try {
+            const v = localStorage.getItem("pronily:video:selectedSource");
+            console.log('AiPornVideo: read selectedSource raw=', v);
+            if (v) setVideoSrc(JSON.parse(v));
+          } catch {}
+        } else {
+          try { localStorage.removeItem('pronily:video:selectedCharacter'); } catch (e) {}
+          try { localStorage.removeItem('pronily:video:selectedPose'); } catch (e) {}
+          try { localStorage.removeItem('pronily:video:selectedSource'); } catch (e) {}
+          setCharacter(null); setPose(null); setVideoSrc(null);
+        }
+      }, [location]);
+    };
+    const onStorage = (e) => { if (e.key && e.key.startsWith('pronily:video:')) read(); };
+    const onVis = () => { if (!document.hidden) read(); };
+    window.addEventListener('storage', onStorage);
+    document.addEventListener('visibilitychange', onVis);
+    return () => { window.removeEventListener('storage', onStorage); document.removeEventListener('visibilitychange', onVis); };
   }, []);
 
   const clear = (key) => {
@@ -124,7 +201,7 @@ export default function AiPornVideo() {
         </div>
         <button
           type="button"
-          onClick={() => navigate("/ai-porn")}
+          onClick={() => navigate("/ai-porn/gallery")}
           className="rounded-lg px-4 py-2 text-sm border border-pink-500 text-pink-300 hover:bg-pink-500/10"
         >
           Gallery
@@ -142,9 +219,13 @@ export default function AiPornVideo() {
               className="w-full rounded-xl border border-white/15 bg-white/[.02] p-5 text-left hover:border-pink-500/60"
             >
               <div className="flex items-center gap-3">
-                <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/10">
-                  <IconUserPlus className="w-5 h-5" />
-                </span>
+                {character && character.img ? (
+                  <img src={character.img} alt={character.name} className="h-9 w-9 rounded-lg object-cover" />
+                ) : (
+                  <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/10">
+                    <IconUserPlus className="w-5 h-5" />
+                  </span>
+                )}
                 <div>
                   <div className="text-sm text-white/70">Select</div>
                   <div className="text-base font-medium">{character?.name || "Character"}</div>

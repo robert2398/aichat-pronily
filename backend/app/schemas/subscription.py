@@ -13,7 +13,8 @@ class CheckoutSessionResponse(BaseModel):
 
 class SubscriptionStatusResponse(BaseModel):
     plan_name: str | None = None
-    status: str | None = None
+    # allow boolean for easy false/true reporting or string for textual statuses
+    status: str | bool | None = None
     current_period_end: datetime | None = None
 """
 Pydantic schemas for Subscription.

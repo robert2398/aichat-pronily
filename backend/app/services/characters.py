@@ -104,8 +104,8 @@ async def enhance_prompt(prompt):
         return enhanced_prompt
     except:
         return prompt
-        
-async def generate_image_request(prompt, num_images,initial_image,size_orientation):
+
+async def generate_image(prompt, num_images, initial_image, size_orientation):
     apiurl = await get_config_value_from_cache("IMAGE_GEN_URL")
     ai_model = await get_config_value_from_cache("IMAGE_GEN_MODEL")
     weight = await get_config_value_from_cache("IMAGE_GEN_WEIGHT")
@@ -129,9 +129,9 @@ async def generate_image_request(prompt, num_images,initial_image,size_orientati
             "cfg_scale" : cfg_scale,
             "username" : username 
             }
-    print('Image Generation Payload:', data)
+    #print('Image Generation Payload:', data)
     response = requests.post(apiurl, headers = headers, json=data)
-    print('Image Generation Response:', response.text, response.status_code)
+    print('Image Generation Response:', response.status_code)
     return response
 
 def save_image_to_local_storage(image_data_str, filepath):
@@ -151,9 +151,10 @@ def save_image_to_local_storage(image_data_str, filepath):
     image.save(filepath)  # Save as
     print(f"Image saved to {filepath}")
 
-async def generate_username_filename(username: str) -> str:
+async def generate_filename_timestamped(username: str) -> str:
     safe_username = username.replace(" ", "_").lower()
-    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    # Use microseconds (%f), then truncate to milliseconds
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
     filename = f"{safe_username}_{timestamp}"
     return filename
 

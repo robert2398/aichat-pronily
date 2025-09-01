@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Heart, MessageSquare } from "lucide-react";
 
 // reuse the same tile layout as AiChat
@@ -40,14 +41,14 @@ function ChatCharacterCard({ item, onOpen }) {
   );
 }
 
-export default function SelectCharacterImage() {
+export default function MyAI() {
   const navigate = useNavigate();
-  const location = useLocation();
 
   const [characters, setCharacters] = useState([]);
   const [loadingChars, setLoadingChars] = useState(false);
   const [charsError, setCharsError] = useState(null);
-  const [source, setSource] = useState("Default");
+  const [reloadKey, setReloadKey] = useState(0);
+  const location = useLocation();
 
   const IMAGE_CACHE_KEY = "pronily:characters:image_cache";
   const IMAGE_CACHE_TTL = 10 * 60 * 60 * 1000;
@@ -85,21 +86,28 @@ export default function SelectCharacterImage() {
       setLoadingChars(true);
       setCharsError(null);
       try {
-        const base = import.meta.env.VITE_API_BASE_URL;
-        if (!base) {
-          throw new Error('VITE_API_BASE_URL not configured');
+        const envBase = import.meta.env.VITE_API_BASE_URL;
+        const base = envBase || (typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : '');
+        if (!base) throw new Error('API base URL not configured');
+
+        const stored = localStorage.getItem('pronily:auth:token');
+        if (!stored) {
+          throw new Error('Not authenticated');
         }
-        const url = `${base.replace(/\/$/, "")}/characters/fetch-default`;
-        const res = await fetch(url, { method: 'GET' });
+        const tokenOnly = stored.replace(/^bearer\s+/i, '').trim();
+
+        const url = `${base.replace(/\/$/, '')}/characters/fetch-loggedin-user`;
+        const res = await fetch(url, { headers: { 'Content-Type': 'application/json', Authorization: `bearer ${tokenOnly}` } });
         if (!res.ok) {
-          const txt = await res.text();
+          const txt = await res.text().catch(()=>null);
           throw new Error(txt || res.statusText || `HTTP ${res.status}`);
         }
         const data = await res.json();
         if (cancelled) return;
 
-        const mapped = (Array.isArray(data) ? data : []).map((d) => {
-          const rawUrl = d.image_url_s3 || d.image_url || "";
+        const chars = Array.isArray(data) ? data : (data.characters || data.data || []);
+        const mapped = (chars || []).map((d) => {
+          const rawUrl = d.image_url_s3 || d.image_url || d.img || "";
           const cached = rawUrl ? getCachedImage(d.id) : null;
           const finalUrl = cached || rawUrl || "";
           if (rawUrl && !cached) setCachedImage(d.id, rawUrl);
@@ -122,41 +130,59 @@ export default function SelectCharacterImage() {
     };
     fetchChars();
     return () => { cancelled = true; };
-  }, []);
+  }, [reloadKey]);
 
-  const onSelect = (character) => {
+  // Watch for navigation state or createdCharacter marker to trigger reload
+  useEffect(() => {
     try {
-      localStorage.setItem("pronily:image:selectedCharacter", JSON.stringify(character));
+      const st = location.state || {};
+      if (st.refresh) {
+        // clear the navigation state to avoid repeated reloads
+        try { window.history.replaceState({}, document.title); } catch (e) {}
+        setReloadKey((k) => k + 1);
+        return;
+      }
     } catch (e) {}
-    // return to image generator so it picks up the selection
-    navigate("/ai-porn/image", { state: { fromSelect: true } });
+    try {
+      const created = localStorage.getItem('pronily:createdCharacter');
+      if (created) {
+        // clear marker and reload
+        try { localStorage.removeItem('pronily:createdCharacter'); } catch (e) {}
+        setReloadKey((k) => k + 1);
+      }
+    } catch (e) {}
+  }, [location]);
+
+  const onOpen = (character) => {
+    try { localStorage.setItem('pronily:image:selectedCharacter', JSON.stringify(character)); } catch (e) {}
+    // open chat for this character
+    navigate(`/ai-chat/${character.id}`);
   };
 
   return (
     <section className="w-full max-w-7xl mx-auto p-6 sm:p-8">
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          className="grid h-9 w-9 place-items-center rounded-full border border-white/10 hover:bg-white/5"
-          aria-label="Back"
-        >
-          <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
-            <path d="M15 6 9 12l6 6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-        <h1 className="text-2xl font-semibold">Select Character Image</h1>
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <h1 className="text-2xl font-semibold">My AI</h1>
+        <div className="ml-auto">
+          <button
+            type="button"
+            onClick={() => navigate('/create-character')}
+            className="rounded-xl px-4 py-2 font-semibold text-white bg-gradient-to-r from-pink-600 via-pink-400 to-indigo-500"
+          >
+            Create Character
+          </button>
+        </div>
       </div>
 
-  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
         {loadingChars ? (
           <div className="col-span-full text-center text-sm text-white/70">Loading characters...</div>
         ) : charsError ? (
           <div className="col-span-full text-center text-sm text-red-400">{charsError}</div>
         ) : characters.length === 0 ? (
-          <div className="col-span-full text-center text-sm text-white/70">No characters available.</div>
+          <div className="col-span-full text-center text-sm text-white/70">No characters found.</div>
         ) : (
-          characters.map((c) => <ChatCharacterCard key={c.id} item={c} onOpen={onSelect} />)
+          characters.map((c) => <ChatCharacterCard key={c.id} item={c} onOpen={onOpen} />)
         )}
       </div>
     </section>

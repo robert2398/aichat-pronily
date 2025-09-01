@@ -9,7 +9,7 @@ from app.schemas.character import CharacterCreate, CharacterRead
 from app.api.v1.deps import get_current_user
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.services.characters import generate_image_request
+from app.services.characters import generate_image
 from app.core.aws_s3 import generate_presigned_url
 from app.services.app_config import get_config_value_from_cache
 from typing import List, Dict
@@ -69,8 +69,8 @@ async def edit_character(character_id: int, character_data: CharacterCreate, db:
         raise HTTPException(status_code=404, detail="Character not found")
 
     # 1. Prepare image generation request
-    url_generate_image = await generate_image_request(character_data)
-    
+    url_generate_image = await generate_image(character_data)
+
     # 2. Send get generated image api request
     is_image_generated, base64_image = await get_generated_image(url_generate_image)
     

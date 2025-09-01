@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Mars, Venus, Transgender, Image, Palette, Heart, MessageSquare } from "lucide-react";
 import Dropdown from "../ui/Dropdown";
@@ -27,28 +27,24 @@ function CharacterTile({ item, onSelect }) {
     >
       {/* image or fallback */}
       {item.img ? (
-        <img src={item.img} alt={item.name} className="h-64 w-full object-cover" />
+        <img src={item.img} alt={item.name} className="h-80 w-full object-cover object-top" />
       ) : (
-        <div className="h-64 w-full bg-transparent" />
+        <div className="h-80 w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />
       )}
       {/* subtle bottom gradient for legibility */}
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/45 pointer-events-none" />
-      <div className="absolute left-4 right-4 bottom-4 p-0">
-        <div className="px-2 pb-1">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-white text-lg font-semibold leading-tight drop-shadow-md">{item.name}, {item.age}</p>
-          </div>
-          {item.bio ? (
-            <p className="mt-2 text-sm text-pink-300 leading-snug max-h-12 overflow-hidden text-ellipsis drop-shadow-sm">{item.bio}</p>
-          ) : null}
+      <div className="absolute left-3 right-3 bottom-3 p-0">
+        <div className="px-3 pb-2">
+          <p className="text-white text-sm font-semibold drop-shadow-md">{item.name}</p>
+          <p className="text-white/60 text-xs mt-1 drop-shadow-sm">{item.age} • {item.bio}</p>
 
-          <div className="mt-3 flex items-center gap-4 text-sm">
+          <div className="mt-2 flex items-center gap-3 text-xs">
             <span className="inline-flex items-center gap-2 text-pink-300">
-              <Heart className="h-4 w-4 text-pink-400" aria-hidden />
+              <Heart className="h-3.5 w-3.5 text-pink-400" aria-hidden />
               {item.likes}
             </span>
-            <span className="inline-flex items-center gap-2 text-white/90">
-              <MessageSquare className="h-4 w-4" aria-hidden />
+            <span className="inline-flex items-center gap-2 text-pink-300">
+              <MessageSquare className="h-3.5 w-3.5" aria-hidden />
               {item.messages}
             </span>
           </div>
@@ -77,22 +73,82 @@ export default function SelectCharacter() {
     }
   });
 
-  // demo data – replace img with your actual thumbnails when ready
-  const characters = useMemo(
-    () =>
-      Array.from({ length: 12 }).map((_, i) => ({
-  id: i + 1,
-  name: `Luna ${i + 1}`,
-  age: 20 + (i % 6),
-  bio: "Luna Smith is pure temptation. With soft hair, a backless gown hugging..",
-  img: "",
-  likes: "1.5k",
-  messages: "1M",
-  gender: i % 3 === 0 ? "female" : i % 3 === 1 ? "male" : "trans",
-  style: i % 5 === 0 ? "anime" : "realistic",
-      })),
-    []
-  );
+  const [characters, setCharacters] = useState([]);
+  const [loadingChars, setLoadingChars] = useState(false);
+  const [charsError, setCharsError] = useState(null);
+
+  const IMAGE_CACHE_KEY = "pronily:characters:image_cache";
+  const IMAGE_CACHE_TTL = 10 * 60 * 60 * 1000; // 10 hours
+
+  const getCachedImage = (id) => {
+    try {
+      const raw = localStorage.getItem(IMAGE_CACHE_KEY);
+      if (!raw) return null;
+      const map = JSON.parse(raw || "{}") || {};
+      const entry = map[String(id)];
+      if (!entry) return null;
+      if (!entry.expiresAt || Number(entry.expiresAt) < Date.now()) return null;
+      return entry.url || null;
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const setCachedImage = (id, url) => {
+    try {
+      const raw = localStorage.getItem(IMAGE_CACHE_KEY);
+      const map = (raw && JSON.parse(raw)) || {};
+      map[String(id)] = { url, expiresAt: Date.now() + IMAGE_CACHE_TTL };
+      localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(map));
+    } catch (e) {}
+  };
+
+  // fetch characters from backend on mount — no demo fallback (per request)
+  useEffect(() => {
+    let cancelled = false;
+    const fetchChars = async () => {
+      setLoadingChars(true);
+      setCharsError(null);
+      try {
+        const base = import.meta.env.VITE_API_BASE_URL;
+        if (!base) {
+          throw new Error('VITE_API_BASE_URL not configured');
+        }
+        const url = `${base.replace(/\/$/, "")}/characters/fetch-default`;
+        const res = await fetch(url, { method: 'GET' });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(txt || res.statusText || `HTTP ${res.status}`);
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        const mapped = (Array.isArray(data) ? data : []).map((d) => {
+          const rawUrl = d.image_url_s3 || d.image_url || "";
+          const cached = rawUrl ? getCachedImage(d.id) : null;
+          const finalUrl = cached || rawUrl || "";
+          if (rawUrl && !cached) setCachedImage(d.id, rawUrl);
+          return {
+            id: d.id,
+            name: d.name || d.username,
+            age: d.age || "",
+            bio: d.bio || "",
+            img: finalUrl,
+            likes: d.likes || '1M',
+            messages: d.messages || '1M',
+            gender: d.gender || '',
+            style: d.style || 'realistic',
+          };
+        });
+        setCharacters(mapped);
+      } catch (err) {
+        if (!cancelled) setCharsError(err.message || String(err));
+      } finally {
+        if (!cancelled) setLoadingChars(false);
+      }
+    };
+    fetchChars();
+    return () => { cancelled = true; };
+  }, []);
 
   const onSelect = (character) => {
     // persist selection and return to the correct generator (image or video)
@@ -103,11 +159,9 @@ export default function SelectCharacter() {
     } catch (e) {
       /* ignore */
     }
-    // after selecting a character, navigate to the character-variant selector
-    // which lets the user pick a specific image (for image generator)
-    // or a specific video variant (for video generator).
-    if (location.pathname.includes("/ai-porn/video")) navigate("/ai-porn/video/character-video");
-    else navigate("/ai-porn/image/character-image");
+  // after selecting a character, return to the generator main page so it shows the selection
+  if (location.pathname.includes("/ai-porn/video")) navigate("/ai-porn/video", { state: { fromSelect: true } });
+  else navigate("/ai-porn/image", { state: { fromSelect: true } });
   };
 
   const location = useLocation();
@@ -273,9 +327,13 @@ export default function SelectCharacter() {
         </div>
       </div>
 
-      {/* grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5">
-        {filteredCharacters.length > 0 ? (
+  {/* grid */}
+  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+        {loadingChars ? (
+          <div className="col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5 text-center text-sm text-white/70">Loading characters...</div>
+        ) : charsError ? (
+          <div className="col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5 text-center text-sm text-red-400">{charsError}</div>
+        ) : filteredCharacters.length > 0 ? (
           filteredCharacters.map((c) => <CharacterTile key={c.id} item={c} onSelect={onSelect} />)
         ) : (
           <div className="col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5 rounded-md border border-white/10 bg-white/[.02] p-6 text-center">

@@ -1,9 +1,11 @@
 import { BadgeCheck, Landmark, CreditCard, ShieldCheck, Instagram, Facebook, Twitter } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import FooterLink from "./FooterLink";
 import SocialLink from "./SocialLink";
 import Badge from "./Badge";
 
 export default function Footer() {
+  const navigate = useNavigate();
   console.log("Footer render");
   return (
     <footer className="mt-10 border-t border-white/10">
@@ -11,7 +13,7 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
           <div>
-            <a href="#home" className="inline-flex items-center gap-2" aria-label="Pronily home" onClick={() => console.log("Footer brand click") }>
+            <a href="#home" className="inline-flex items-center gap-2" aria-label="Pronily home" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
               <img src="/img/Logo.svg" alt="Pronily" className="h-8 w-auto" />
             </a>
             <p className="mt-4 max-w-xs text-sm text-white/70">

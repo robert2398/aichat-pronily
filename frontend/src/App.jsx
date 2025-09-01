@@ -33,8 +33,12 @@ import SelectCharacterImage from "./components/ai/SelectCharacterImage";
 import SelectCharacterVideo from "./components/ai/SelectCharacterVideo";
 import AiPornVideo from "./components/ai/AiPornVideo";
 import AiChat from "./components/AiChat";
+import MyAI from "./components/MyAI";
 import CreateCharacter from "./components/CreateCharacter";
 import CreateCharacterSave from "./components/CreateCharacterSave";
+import Gallery from "./components/ai/Gallery";
+import Settings from "./components/Settings";
+import ChangePassword from "./components/ChangePassword";
 import { Routes, Route } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 
@@ -83,6 +87,22 @@ export default function App() {
           }
         />
         <Route
+          path="/my-ai"
+          element={
+            <main className="mx-auto max-w-7xl px-4 py-12">
+              <MyAI />
+            </main>
+          }
+        />
+        <Route
+          path="/characters"
+          element={
+            <main className="mx-auto max-w-7xl px-4 py-12">
+              <AiChat />
+            </main>
+          }
+        />
+        <Route
           path="/ai-chat/:id"
           element={
             <main className="mx-auto max-w-7xl px-4 py-12">
@@ -117,7 +137,7 @@ export default function App() {
         <Route
           path="/ai-porn/image/character"
           element={
-            <main className="mx-auto max-w-5xl px-4 py-12">
+            <main className="mx-auto max-w-7xl px-4 py-12">
               <SelectCharacter />
             </main>
           }
@@ -125,7 +145,7 @@ export default function App() {
         <Route
           path="/ai-porn/image/character-image"
           element={
-            <main className="mx-auto max-w-5xl px-4 py-12">
+            <main className="mx-auto max-w-7xl px-4 py-12">
               <SelectCharacterImage />
             </main>
           }
@@ -165,7 +185,7 @@ export default function App() {
         <Route
           path="/ai-porn/video/character"
           element={
-            <main className="mx-auto max-w-5xl px-4 py-12">
+            <main className="mx-auto max-w-7xl px-4 py-12">
               <SelectCharacter />
             </main>
           }
@@ -173,7 +193,7 @@ export default function App() {
         <Route
           path="/ai-porn/video/character-video"
           element={
-            <main className="mx-auto max-w-5xl px-4 py-12">
+            <main className="mx-auto max-w-7xl px-4 py-12">
               <SelectCharacterVideo />
             </main>
           }
@@ -203,10 +223,34 @@ export default function App() {
           }
         />
         <Route
+          path="/ai-porn/gallery"
+          element={
+            <main className="mx-auto max-w-7xl px-4 py-12">
+              <Gallery />
+            </main>
+          }
+        />
+        <Route
           path="/pricing"
           element={
             <main className="mx-auto max-w-7xl px-4 py-12">
               <Pricing />
+            </main>
+          }
+        />
+        <Route
+          path="/settings"
+          element={
+            <main className="mx-auto max-w-7xl px-4 py-12">
+              <Settings />
+            </main>
+          }
+        />
+        <Route
+          path="/change-password"
+          element={
+            <main className="mx-auto max-w-2xl px-4 py-12">
+              <ChangePassword />
             </main>
           }
         />

@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, X, Search } from "lucide-react";
+import Dropdown from "./ui/Dropdown";
 // using the single SVG logo in /img/Logo.svg for header (favico uses the same file)
 
 export default function Header() {
@@ -8,13 +9,169 @@ export default function Header() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = [
-    { label: "Gallery", href: "#gallery" },
+  // AI Characters will open a popover that fetches default characters and shows a small grid
+  { label: "AI Characters", href: "/characters" },
+  { label: "Gallery", href: "#gallery" },
   { label: "AI Porn Generator", href: "/ai-porn" },
     { label: "AI Chat", href: "/ai-chat" },
     { label: "AI Story", href: "#ai-story" },
     { label: "Premium", href: "/pricing" },
     { label: "Company", href: "#company" },
   ];
+  const [user, setUser] = useState(null);
+  const [coinBalance, setCoinBalance] = useState(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+
+  const lastTokenRef = useRef(null);
+
+  // helper to fetch coin balance given a token
+  async function fetchCoinBalance(token) {
+    if (!token) return setCoinBalance(null);
+    try {
+      const base = import.meta.env.VITE_API_BASE_URL || "";
+      const res = await fetch(`${base}/subscription/get-user-coin`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const data = await res.json();
+      setCoinBalance(data?.coin_balance ?? 0);
+    } catch (err) {
+      console.warn("Failed to fetch coin balance", err);
+      setCoinBalance(null);
+    }
+  }
+
+  useEffect(() => {
+    // initialize from localStorage
+    function readAuthFromStorage() {
+      const token = localStorage.getItem("pronily:auth:token") || null;
+      const raw = localStorage.getItem("pronily:auth:raw");
+      let parsedUser = null;
+
+      if (raw) {
+        try {
+          const r = JSON.parse(raw);
+          // Your /login sample shape:
+          // { access_token, token_type, user: { role: "admin", ... } }
+          let u = r?.user ?? r?.data?.user ?? r?.data ?? r ?? null;
+          if (u && u.user) u = u.user; // unwrap once more if needed
+          parsedUser = u || null;
+        } catch (e) {
+          parsedUser = null;
+        }
+      }
+
+      // fallback: old keys (optional)
+      if (!parsedUser) {
+        const alt = localStorage.getItem('user');
+        if (alt) {
+          try {
+            const a = JSON.parse(alt);
+            let u = a?.user ?? a?.data?.user ?? a?.data ?? a ?? null;
+            if (u && u.user) u = u.user;
+            parsedUser = u || null;
+          } catch (e) {}
+        }
+      }
+
+      // final fallback
+      const email = localStorage.getItem('pronily:auth:email');
+      if (!parsedUser && email) parsedUser = { email };
+
+      if (token) {
+        setUser(parsedUser);
+        // If your token already has "Bearer " prefix, this is fine:
+        fetchCoinBalance(token.replace(/^Bearer\s+/i, '') || token);
+      } else {
+        setUser(null);
+        setCoinBalance(null);
+      }
+
+      lastTokenRef.current = localStorage.getItem("pronily:auth:token");
+    }
+
+    readAuthFromStorage();
+
+    // cross-tab updates: listen to the actual keys this app uses
+    function onStorage(e) {
+      // our app stores auth under 'pronily:auth:token' and raw response under 'pronily:auth:raw'
+      if (e.key === "pronily:auth:token" || e.key === "pronily:auth:raw") {
+        readAuthFromStorage();
+      }
+    }
+    window.addEventListener("storage", onStorage);
+
+    // same-window changes (storage event doesn't fire in same tab) - lightweight poll
+    // Compare the same key we read earlier to avoid a perpetual mismatch.
+    const interval = setInterval(() => {
+      const token = localStorage.getItem("pronily:auth:token");
+      if (token !== lastTokenRef.current) {
+        readAuthFromStorage();
+      }
+    }, 1000);
+
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      clearInterval(interval);
+    };
+  }, [location]);
+
+  function handleLogout() {
+    localStorage.removeItem('pronily:auth:token');
+    localStorage.removeItem('pronily:auth:raw');
+    localStorage.removeItem('pronily:auth:email');
+    // (optional) clean legacy keys:
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('user');
+
+    setUser(null);
+    setCoinBalance(null);
+    navigate('/');
+  }
+
+  // Open user's gallery: fetch media with auth token, cache and navigate to /gallery
+  async function openMyGallery() {
+    try {
+      const base = import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : '');
+      if (!base) {
+        navigate('/ai-porn/gallery');
+        return;
+      }
+      const url = `${base.replace(/\/$/, '')}/characters/media/get-users-character-media`;
+      const headers = { 'Content-Type': 'application/json' };
+      const stored = localStorage.getItem('pronily:auth:token');
+      if (stored) {
+        const tokenOnly = stored.replace(/^bearer\s+/i, '').trim();
+        headers['Authorization'] = `bearer ${tokenOnly}`;
+      } else if (import.meta.env.VITE_API_AUTH_TOKEN) {
+        headers['Authorization'] = import.meta.env.VITE_API_AUTH_TOKEN;
+      }
+
+      let items = [];
+      try {
+        const res = await fetch(url, { headers });
+        if (res.ok) {
+          const data = await res.json();
+          items = data.images || data.data || [];
+        }
+      } catch (e) {
+        // ignore fetch errors here; gallery page will handle fallback
+        console.warn('openMyGallery: fetch failed', e);
+      }
+
+      try {
+        const CACHE_KEY = 'pronily:gallery:cache';
+        const CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours
+        const payload = { items, expiresAt: Date.now() + CACHE_TTL };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+      } catch (e) {}
+
+  navigate('/ai-porn/gallery');
+    } catch (e) {
+      console.warn('openMyGallery error', e);
+  navigate('/ai-porn/gallery');
+    }
+  }
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-white/5 backdrop-blur supports-[backdrop-filter]:bg-white/5" role="banner">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -24,7 +181,7 @@ export default function Header() {
             href="/"
             className="group inline-flex items-center gap-2"
             aria-label="Pronily home"
-            onClick={(e) => { e.preventDefault(); /* perform a full reload to root */ location.href = '/'; }}
+            onClick={(e) => { e.preventDefault(); navigate('/'); }}
           >
             <img src="/img/Logo.svg" alt="Pronily" className="h-8 w-auto" />
           </a>
@@ -48,27 +205,142 @@ export default function Header() {
               </a>
             ))}
           </nav>
-          {/* Right: CTAs (desktop) - removed search per request */}
+          {/* Right: CTAs (desktop) and Profile (conditional) */}
           <div className="hidden md:flex items-center gap-3">
-            <a
-              href="/signin"
-              className="rounded-xl px-3 py-2 text-sm/6 text-white/80 ring-1 ring-inset ring-white/15 hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-              onClick={() => {
-                console.log("Sign in click (desktop)");
-                navigate('/signin',{state:{background:location}});
-              }}
-            >
-              Sign in
-            </a>
-            <a
-              href="#get-started"
-              className="rounded-xl px-3 py-2 text-sm font-medium text-[#0A011A] bg-gradient-to-r from-violet-300 via-fuchsia-200 to-sky-200 shadow-[0_0_0_1px_rgba(255,255,255,0.15)_inset] hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-              onClick={() => {
-                console.log("Get started click (desktop)");
-              }}
-            >
-              Get started
-            </a>
+            {!user ? (
+              <>
+                <a
+                  href="/signin"
+                  className="rounded-xl px-3 py-2 text-sm/6 text-white/80 ring-1 ring-inset ring-white/15 hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  onClick={() => {
+                    console.log("Sign in click (desktop)");
+                    navigate('/signin',{state:{background:location}});
+                  }}
+                >
+                  Sign in
+                </a>
+                <a
+                  href="#get-started"
+                  className="rounded-xl px-3 py-2 text-sm font-medium text-[#0A011A] bg-gradient-to-r from-violet-300 via-fuchsia-200 to-sky-200 shadow-[0_0_0_1px_rgba(255,255,255,0.15)_inset] hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                  onClick={() => {
+                    console.log("Get started click (desktop)");
+                  }}
+                >
+                  Get started
+                </a>
+              </>
+            ) : (
+              <div className="flex items-center gap-3">
+                {/* GEMS */}
+                <button
+                  className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium text-white/90 bg-white/10 ring-1 ring-white/10 hover:bg-white/15 focus:outline-none"
+                  aria-label="Gems balance"
+                >
+                  {/* Diamond gem w/ facets */}
+                  <svg
+                    className="w-5 h-5 shrink-0"
+                    viewBox="0 0 20 20"
+                    xmlns="http://www.w3.org/2000/svg"
+                    aria-hidden
+                  >
+                    <defs>
+                      <linearGradient id="gemGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stopColor="#FF66C4" />
+                        <stop offset="1" stopColor="#FF2EA6" />
+                      </linearGradient>
+                    </defs>
+                    {/* main body */}
+                    <path d="M10 1 L17 8 L10 19 L3 8 Z" fill="url(#gemGrad)"/>
+                    {/* top facet highlight */}
+                    <path d="M10 1 L13.5 8 L6.5 8 Z" fill="#FFFFFF" opacity=".25"/>
+                    {/* side facets (subtle shading) */}
+                    <path d="M3 8 L6.5 8 L10 19 Z" fill="#000000" opacity=".07"/>
+                    <path d="M17 8 L13.5 8 L10 19 Z" fill="#000000" opacity=".07"/>
+                  </svg>
+
+                  <span className="leading-none">{coinBalance ?? 0} gems</span>
+                  <span className="text-pink-300 text-base leading-none">+</span>
+                </button>
+
+                <Dropdown
+                  onOpenChange={(v) => setProfileOpen(v)}
+                  trigger={
+                    <button className="flex items-center gap-3 focus:outline-none hover:opacity-90">
+                      <img
+                        src={user?.avatar || "/img/Logo.svg"}
+                        alt={user?.full_name || "User"}
+                        className="h-9 w-9 rounded-full object-cover"
+                      />
+                      <span className="text-sm font-medium text-white/90">{user?.full_name}</span>
+                      <svg
+                        className="w-3 h-3 text-white/80 translate-y-[1px]"
+                        viewBox="0 0 20 20"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden
+                      >
+                        <path d="M6 8l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
+                  }
+                >
+                  {({ close }) => {
+                    const isAdmin = String(user?.role ?? "").toLowerCase() === "admin";
+
+                    return (
+                      <div className="w-56 rounded-xl bg-[#0b0710] text-white shadow-lg ring-1 ring-white/10 py-2">
+                        <div className="px-3 pb-2 text-xs text-white/60">{user?.full_name}</div>
+
+                        <div className="flex flex-col">
+                          <button
+                            onClick={() => { navigate('/my-ai'); close(); }}
+                            className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
+                          >
+                            My AI
+                          </button>
+                          <button
+                            onClick={() => { openMyGallery(); close(); }}
+                            className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
+                          >
+                            My Gallery
+                          </button>
+                          <button
+                            onClick={() => { navigate('/pricing'); close(); }}
+                            className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
+                          >
+                            Subscription
+                          </button>
+                          <button
+                            onClick={() => { navigate('/settings', { state: { background: location } }); close(); }}
+                            className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
+                          >
+                            Settings
+                          </button>
+
+                          {isAdmin && (
+                            <button
+                              onClick={() => { navigate('/admin'); close(); }}
+                              className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
+                            >
+                              Admin Dashboard
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="h-px bg-white/5 my-2" />
+
+                        <button
+                          onClick={() => { handleLogout(); close(); }}
+                          className="block w-full text-left px-3 py-2 rounded-md text-rose-400 hover:bg-white/5"
+                        >
+                          Logout
+                        </button>
+                      </div>
+                    );
+                  }}
+                </Dropdown>
+              </div>
+            )}
           </div>
           {/* Mobile menu toggle */}
           <button
@@ -106,20 +378,43 @@ export default function Header() {
               </a>
             ))}
             <div className="mt-1 flex gap-2">
-              <a
-                href="/signin"
-                className="flex-1 rounded-xl px-3 py-2 text-center text-sm/6 text-white/90 ring-1 ring-inset ring-white/15 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                  onClick={() => { setOpen(false); navigate('/signin',{state:{background:location}}); }}
-              >
-                  Sign in
-              </a>
-              <a
-                href="#get-started"
-                className="flex-1 rounded-xl px-3 py-2 text-center text-sm font-medium text-[#0A011A] bg-gradient-to-r from-violet-300 via-fuchsia-200 to-sky-200 hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                onClick={() => { setOpen(false); }}
-              >
-                Get started
-              </a>
+              {!user ? (
+                <>
+                  <a
+                    href="/signin"
+                    className="flex-1 rounded-xl px-3 py-2 text-center text-sm/6 text-white/90 ring-1 ring-inset ring-white/15 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    onClick={() => { setOpen(false); navigate('/signin',{state:{background:location}}); }}
+                  >
+                      Sign in
+                  </a>
+                  <a
+                    href="#get-started"
+                    className="flex-1 rounded-xl px-3 py-2 text-center text-sm font-medium text-[#0A011A] bg-gradient-to-r from-violet-300 via-fuchsia-200 to-sky-200 hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+                    onClick={() => { setOpen(false); }}
+                  >
+                    Get started
+                  </a>
+                </>
+              ) : (
+                <div className="mt-3 border-t border-white/5 pt-3">
+                  <div className="flex items-center gap-3 px-1">
+                    <div className="avatar">
+                      <img src="/img/Logo.svg" alt={user?.full_name || 'avatar'} />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-semibold">{user?.full_name}</div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 grid gap-1 px-1">
+                    {String(user?.role ?? "").toLowerCase() === 'admin' && (
+                      <a onClick={() => { setOpen(false); navigate('/admin'); }} className="block w-full text-left text-sm px-3 py-2 rounded-xl text-white/80 hover:bg-white/5">Admin Dashboard</a>
+                    )}
+                    <a onClick={() => { setOpen(false); openMyGallery(); }} className="block w-full text-left text-sm px-3 py-2 rounded-xl text-white/80 hover:bg-white/5">My Gallery</a>
+                    <a onClick={() => { setOpen(false); handleLogout(); }} className="block w-full text-left text-sm px-3 py-2 rounded-xl text-rose-400 hover:bg-white/5">Logout</a>
+                  </div>
+                </div>
+              )}
             </div>
           </nav>
         </div>

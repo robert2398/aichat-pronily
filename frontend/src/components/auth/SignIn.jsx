@@ -46,12 +46,12 @@ export default function SignIn(){
         return;
       }
 
-      // Find token in common fields
+      // Persist full raw response so Header (and other parts) can parse user info
+      localStorage.setItem('pronily:auth:raw', JSON.stringify(data || {}));
+
+      // Find token in common fields and save normalized token if present
       const token = data && (data.access_token || data.token || data.access || data.auth_token || (data.data && data.data.token));
-      if (!token) {
-        // If server returned the full auth object, store it as-is for later inspection
-        localStorage.setItem('pronily:auth:raw', JSON.stringify(data || {}));
-      } else {
+      if (token) {
         // normalize to a Bearer string if not already present
         const normalized = typeof token === 'string' && token.toLowerCase().startsWith('bearer') ? token : `Bearer ${token}`;
         localStorage.setItem('pronily:auth:token', normalized);

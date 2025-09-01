@@ -40,3 +40,11 @@ class Character(Base):
     image_url_s3 = Column(Text)
     created_at = Column(DateTime(timezone=True), default=datetime.datetime.now(datetime.timezone.utc), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # ORM relationships
+    character_media = relationship(
+        "CharacterMedia",
+        back_populates="character",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )

@@ -46,8 +46,8 @@ export default function SelectBackground() {
       const prefix = isVideo ? "pronily:video:" : "pronily:image:";
       localStorage.setItem(`${prefix}selectedBackground`, JSON.stringify(bg));
     } catch (e) {}
-    if (location.pathname.includes("/ai-porn/video")) navigate("/ai-porn/video");
-    else navigate("/ai-porn/image");
+    if (location.pathname.includes("/ai-porn/video")) navigate("/ai-porn/video", { state: { fromSelect: true } });
+    else navigate("/ai-porn/image", { state: { fromSelect: true } });
   };
 
   const location = useLocation();
