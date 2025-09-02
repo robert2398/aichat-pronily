@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
 from app.models.user import User
-from app.models.user_activation import UserActivation
+from app.models.user import UserActivation
 from app.schemas.user import UserRead, AdminUserCreateRequest
 from app.api.v1.deps import get_db
 from app.api.v1.deps import require_admin

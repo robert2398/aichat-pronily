@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, X, Search } from "lucide-react";
 import Dropdown from "./ui/Dropdown";
-// using the single SVG logo in /img/Logo.svg for header (favico uses the same file)
+// using the header logo in /img/tripleminds_logo.jpg
 
 export default function Header() {
   const [open, setOpen] = useState(false);
@@ -11,7 +11,7 @@ export default function Header() {
   const nav = [
   // AI Characters will open a popover that fetches default characters and shows a small grid
   { label: "AI Characters", href: "/characters" },
-  { label: "Gallery", href: "#gallery" },
+  { label: "Gallery", href: "/ai-porn/gallery" },
   { label: "AI Porn Generator", href: "/ai-porn" },
     { label: "AI Chat", href: "/ai-chat" },
     { label: "AI Story", href: "#ai-story" },
@@ -19,6 +19,7 @@ export default function Header() {
     { label: "Company", href: "#company" },
   ];
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [coinBalance, setCoinBalance] = useState(null);
   const [profileOpen, setProfileOpen] = useState(false);
 
@@ -78,13 +79,30 @@ export default function Header() {
       const email = localStorage.getItem('pronily:auth:email');
       if (!parsedUser && email) parsedUser = { email };
 
+      // Merge cached profile (keeps avatar/full_name between navigations)
+      try {
+        const cached = localStorage.getItem('pronily:profile');
+        if (cached) {
+          const p = JSON.parse(cached || '{}');
+          parsedUser = parsedUser || {};
+          // prefer parsedUser fields but fall back to cached profile values
+          parsedUser.full_name = parsedUser.full_name || parsedUser.name || p.full_name || p.name || p.displayName || parsedUser.fullName || parsedUser.full_name;
+          parsedUser.avatar = parsedUser.avatar || parsedUser.profile_picture || p.profile_image_url || p.avatar || p.profile_picture || parsedUser.picture;
+          parsedUser.email = parsedUser.email || p.email || p.email_id || parsedUser.email;
+          parsedUser.username = parsedUser.username || p.username || parsedUser.username;
+        }
+      } catch (e) { }
+
       if (token) {
         setUser(parsedUser);
-        // If your token already has "Bearer " prefix, this is fine:
-        fetchCoinBalance(token.replace(/^Bearer\s+/i, '') || token);
+        // store cleaned token in state for profile loads and coin fetches
+        const tokenOnly = token.replace(/^Bearer\s+/i, '').trim();
+        setToken(tokenOnly || null);
+        fetchCoinBalance(tokenOnly || token);
       } else {
         setUser(null);
         setCoinBalance(null);
+        setToken(null);
       }
 
       lastTokenRef.current = localStorage.getItem("pronily:auth:token");
@@ -115,6 +133,40 @@ export default function Header() {
       clearInterval(interval);
     };
   }, [location]);
+
+  // When we have a token, fetch the authoritative profile to get profile_image_url and full_name
+  useEffect(() => {
+    let cancelled = false;
+    async function loadProfile() {
+      if (!token) return;
+      try {
+        const base = import.meta.env.VITE_API_BASE_URL || "";
+        const url = `${base.replace(/\/$/, '')}/user/get-profile`;
+        const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` }, credentials: 'include' });
+        if (!res.ok) throw new Error(`Status ${res.status}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setUser((u) => ({
+          ...u,
+          full_name: data.full_name || u?.full_name,
+          email: data.email || data.email_id || u?.email,
+          username: data.username || u?.username,
+          gender: data.gender || u?.gender,
+          birth_date: data.birth_date || u?.birth_date,
+          avatar: data.profile_image_url || u?.avatar,
+          role: data.role || u?.role,
+        }));
+        try {
+          localStorage.setItem('pronily:profile', JSON.stringify({ full_name: data.full_name, profile_image_url: data.profile_image_url, email: data.email, username: data.username, role: data.role }));
+        } catch (e) {}
+      } catch (e) {
+        console.warn('Header: load profile failed', e);
+      }
+    }
+
+    loadProfile();
+    return () => { cancelled = true; };
+  }, [token]);
 
   function handleLogout() {
     localStorage.removeItem('pronily:auth:token');
@@ -180,10 +232,10 @@ export default function Header() {
           <a
             href="/"
             className="group inline-flex items-center gap-2"
-            aria-label="Pronily home"
+            aria-label="Triple Minds home"
             onClick={(e) => { e.preventDefault(); navigate('/'); }}
           >
-            <img src="/img/Logo.svg" alt="Pronily" className="h-8 w-auto" />
+            <img src="/img/tripleminds_logo.jpg" alt="Triple Minds" className="h-8 w-auto" />
           </a>
           {/* Center: Nav (desktop) */}
           <nav className="hidden md:flex items-center gap-1" aria-label="Primary">
@@ -267,7 +319,7 @@ export default function Header() {
                   trigger={
                     <button className="flex items-center gap-3 focus:outline-none hover:opacity-90">
                       <img
-                        src={user?.avatar || "/img/Logo.svg"}
+                        src={user?.avatar || "/img/tripleminds_logo.jpg"}
                         alt={user?.full_name || "User"}
                         className="h-9 w-9 rounded-full object-cover"
                       />
@@ -293,25 +345,25 @@ export default function Header() {
 
                         <div className="flex flex-col">
                           <button
-                            onClick={() => { navigate('/my-ai'); close(); }}
+                            onClick={() => { close(); navigate('/my-ai'); }}
                             className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
                           >
                             My AI
                           </button>
                           <button
-                            onClick={() => { openMyGallery(); close(); }}
+                            onClick={() => { close(); openMyGallery(); }}
                             className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
                           >
                             My Gallery
                           </button>
                           <button
-                            onClick={() => { navigate('/pricing'); close(); }}
+                            onClick={() => { close(); navigate('/pricing'); }}
                             className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
                           >
                             Subscription
                           </button>
                           <button
-                            onClick={() => { navigate('/settings', { state: { background: location } }); close(); }}
+                            onClick={() => { close(); console.debug('Header: Settings clicked'); navigate('/settings'); }}
                             className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
                           >
                             Settings
@@ -319,7 +371,7 @@ export default function Header() {
 
                           {isAdmin && (
                             <button
-                              onClick={() => { navigate('/admin'); close(); }}
+                              onClick={() => { navigate('/dashboard'); close(); }}
                               className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
                             >
                               Admin Dashboard
@@ -330,7 +382,7 @@ export default function Header() {
                         <div className="h-px bg-white/5 my-2" />
 
                         <button
-                          onClick={() => { handleLogout(); close(); }}
+                          onClick={() => { close(); handleLogout(); }}
                           className="block w-full text-left px-3 py-2 rounded-md text-rose-400 hover:bg-white/5"
                         >
                           Logout
@@ -399,8 +451,8 @@ export default function Header() {
                 <div className="mt-3 border-t border-white/5 pt-3">
                   <div className="flex items-center gap-3 px-1">
                     <div className="avatar">
-                      <img src="/img/Logo.svg" alt={user?.full_name || 'avatar'} />
-                    </div>
+                        <img src={user?.avatar || '/img/tripleminds_logo.jpg'} alt={user?.full_name || 'avatar'} />
+                      </div>
                     <div className="flex-1">
                       <div className="text-sm font-semibold">{user?.full_name}</div>
                     </div>

@@ -86,7 +86,7 @@ async def get_file_from_s3_url(s3_url: str, s3_client=None) -> BytesIO:
 
 async def upload_to_s3_file(
     file_obj,                 # file-like object (e.g., from request.files['audio'])
-    s3_key: str,           # character_image/call/voice/image/video
+    s3_key: str,        
     content_type: str,
     bucket_name: str,
     s3_client=None

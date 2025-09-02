@@ -8,7 +8,19 @@ export default function AiPornIndex(){
   return (
   <section className="w-full max-w-3xl bg-white/3 rounded-2xl border border-white/8 p-8 sm:p-10 shadow-lg mx-auto">
       <div className="space-y-6">
-        <h1 className="text-3xl font-semibold">AI Porn Generator</h1>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="grid h-9 w-9 place-items-center rounded-full border border-white/10 hover:bg-white/5"
+            aria-label="Back"
+          >
+            <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M15 6 9 12l6 6" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+          <h1 className="text-3xl font-semibold">AI Porn Generator</h1>
+        </div>
         <p className="text-white/80">Choose an option below to get started. Both generators follow the site theme and will open in this UI.</p>
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
@@ -40,7 +52,7 @@ export default function AiPornIndex(){
           </div>
         </div>
         <div className="pt-2">
-          <button className="text-sm text-white/70 hover:text-white" onClick={()=>navigate('/')}>Back to site</button>
+          <button onClick={() => navigate(-1)} className="rounded-md border px-4 py-2 text-sm text-white/90 hover:bg-white/5">Back</button>
         </div>
       </div>
     </section>

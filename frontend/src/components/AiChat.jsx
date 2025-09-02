@@ -391,7 +391,7 @@ export default function AiChat() {
       let url = '';
       const headers = { 'Content-Type': 'application/json' };
       if (source === 'Default') {
-        url = `${base.replace(/\/$/, '')}/characters/media/get-default-character-images`;
+        url = `${base.replace(/\/$/, '')}/characters/media/get-default-character-media`;
         console.debug('AiChat: gallery - fetching (media)', url);
         try { setGalleryFetchUrl(url); setGalleryFetchStatus('loading'); } catch (e) {}
         // public or token-provided access allowed for media

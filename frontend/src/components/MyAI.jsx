@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useLocation } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import { Heart, MessageSquare } from "lucide-react";
+import { Heart, MessageSquare, ChevronLeft } from "lucide-react";
 
 // reuse the same tile layout as AiChat
 function ChatCharacterCard({ item, onOpen }) {
@@ -160,9 +160,18 @@ export default function MyAI() {
   };
 
   return (
-    <section className="w-full max-w-7xl mx-auto p-6 sm:p-8">
+    <section className="w-full max-w-7xl mx-auto px-2 sm:px-2 pt-2 sm:pt-2 pb-2">
       <div className="flex items-center justify-between gap-3 mb-6">
-        <h1 className="text-2xl font-semibold">My AI</h1>
+        <div className="flex items-center gap-3">
+          <button
+            className="grid h-9 w-9 place-items-center rounded-full border border-white/10 hover:bg-white/5"
+            onClick={() => navigate(-1)}
+            aria-label="Back"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <h1 className="text-2xl font-semibold">My AI</h1>
+        </div>
         <div className="ml-auto">
           <button
             type="button"

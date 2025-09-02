@@ -22,9 +22,12 @@ class ImageResponse(BaseModel):
     created_at: datetime
 
 class VideoCreate(BaseModel):
+    character_id: int
+    name: str
     prompt: str
     duration: int
-    resolution: Literal["720p", "1080p", "4k"] = "1080p"
+    negative_prompt: str
+    pose: str
 
 class VideoResponse(BaseModel):
     video_url: str

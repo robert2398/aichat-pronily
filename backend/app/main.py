@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 #from app.api.v1 import deps
 from app.api.v1.endpoints import auth, characters, chats, character_media, \
-            analytics, password_reset, subscription, voice, pricing_promo
+            analytics, subscription, user, voice, pricing_promo
 from app.api.v1.endpoints.admin import model_management, user_management, app_config_management, \
             character_management, pricing_promo_management, dashboard
 from app.services import app_config
@@ -34,7 +34,7 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:3000", "http://localhost:5173", "http://13.48.108.119:3000", "http://13.48.108.119:5173"],  # TODO: Restrict in prod
+        allow_origins=["http://localhost:5174", "http://localhost:5173", "http://13.48.108.119:5174", "http://13.48.108.119:5173"],  # TODO: Restrict in prod
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -43,7 +43,7 @@ def create_app() -> FastAPI:
 
     # Routers
     app.include_router(auth.router, prefix="/api/v1/auth", tags=["auth"])
-    app.include_router(password_reset.router, prefix="/api/v1/auth", tags=["auth"])
+    app.include_router(user.router, prefix="/api/v1/user", tags=["auth"])
     app.include_router(characters.router, prefix="/api/v1/characters", tags=["characters"])
     app.include_router(character_media.router, prefix="/api/v1/characters/media", tags=["characters"])
     app.include_router(chats.router, prefix="/api/v1/chats", tags=["chats"])

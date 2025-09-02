@@ -11,8 +11,9 @@ from app.models.character import Character
 from app.models.user import User
 from app.core.config import settings
 from app.core.aws_s3 import upload_to_s3_file, get_file_from_s3_url
-from app.services.characters import generate_image, build_character_prompt, \
+from app.services.character_media import generate_image, build_character_prompt, \
                     enhance_prompt, generate_filename_timestamped
+
 from app.core.aws_s3 import generate_presigned_url
 from app.services.app_config import get_config_value_from_cache
 from sqlalchemy.ext.asyncio import AsyncSession

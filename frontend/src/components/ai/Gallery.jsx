@@ -1,19 +1,50 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ChevronLeft } from 'lucide-react';
 
-function Thumb({ item, onOpen }) {
+function Thumb({ item, onOpen, onDownload, isDownloading = false }) {
   const src = item.s3_path_gallery || item.s3_path || item.s3_url || item.media_url || item.image_s3_url || item.image_url_s3 || item.image_url || item.url || item.path || item.file || item.image || item.img || item.signed_url || item.signedUrl || (item.attributes && (item.attributes.s3_path_gallery || item.attributes.url || item.attributes.path || item.attributes.image_s3_url || item.attributes.image_url_s3 || item.attributes.s3_url || item.attributes.media_url || item.attributes.file || item.attributes.img));
   const isVideo = (item.mime_type || item.content_type || '').toString().startsWith('video') || (src && /\.(mp4|webm|ogg)$/i.test(src));
   return (
-    <button onClick={() => onOpen(item)} className="rounded overflow-hidden bg-white/5">
-      <div className="w-full aspect-[4/5]">
-        {isVideo ? (
-          <video src={src} className="w-full h-full object-cover object-top" muted preload="metadata" />
-        ) : (
-          <img src={src} alt={item.id} className="w-full h-full object-cover object-top" />
-        )}
-      </div>
-    </button>
+    <div className="rounded overflow-hidden bg-white/5 relative group">
+      <button type="button" onClick={() => onOpen(item)} className="w-full block">
+        <div className="w-full aspect-[4/5]">
+          {isVideo ? (
+            <video src={src} className="w-full h-full object-cover object-top" muted preload="metadata" />
+          ) : (
+            <img src={src} alt={item.id} className="w-full h-full object-cover object-top" />
+          )}
+        </div>
+      </button>
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); if (onDownload && src) onDownload(src); }}
+        className="absolute top-2 right-2 inline-flex items-center gap-2 px-2 py-1 rounded bg-black/60 text-xs opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+        aria-label="Download"
+        disabled={!src || isDownloading}
+      >
+        {isDownloading ? <IconSpinner className="w-4 h-4 text-white animate-spin" /> : <IconDownload className="w-4 h-4 text-white" />}
+      </button>
+    </div>
+  );
+}
+
+function IconDownload({ className = 'w-4 h-4' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M12 3v12" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 11l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M21 21H3" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconSpinner({ className = 'w-4 h-4' }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="1.8">
+      <circle cx="12" cy="12" r="9" strokeOpacity="0.2" />
+      <path d="M21 12a9 9 0 0 0-9-9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
@@ -67,6 +98,144 @@ export default function Gallery() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [viewer, setViewer] = useState(null); // item or null
+  const [downloading, setDownloading] = useState(null); // url string while downloading
+
+  // derive a sensible filename from an s3 url
+  const getFilenameFromUrl = (url) => {
+    try {
+      if (!url || typeof url !== 'string') return 'download.bin';
+      const clean = url.split('?')[0].split('#')[0];
+      const parts = clean.split('/').filter(Boolean);
+      const last = parts[parts.length - 1] || '';
+      if (last && last.includes('.')) return last;
+      const extMatch = clean.match(/\.(jpg|jpeg|png|webp|mp4|webm|ogg)(?:$|\?)/i);
+      const ext = extMatch ? extMatch[0].replace('.', '') : 'bin';
+      return `download.${ext}`;
+    } catch (e) {
+      return 'download.bin';
+    }
+  };
+  // ---- download helpers following user's guidance ----
+  const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
+  const API_ORIGIN = (() => {
+    try {
+      return API_BASE ? new URL(API_BASE).origin : null;
+    } catch {
+      return null;
+    }
+  })();
+  const getOrigin = (u) => {
+    try {
+      return new URL(u, window.location.href).origin;
+    } catch {
+      return null;
+    }
+  };
+  const isSameOrApiOrigin = (u) => {
+    const o = getOrigin(u);
+    return o === window.location.origin || (API_ORIGIN && o === API_ORIGIN);
+  };
+
+  const getFilenameFromHeadersOrUrl = (res, url) => {
+    try {
+      const cd = res?.headers?.get?.('content-disposition');
+      if (cd) {
+        const m = cd.match(/filename\*?=(?:UTF-8''|")?([^\";]+)\"?/i);
+        if (m && m[1]) return decodeURIComponent(m[1].replace(/\"/g, ''));
+      }
+    } catch (e) {}
+    return getFilenameFromUrl(url);
+  };
+
+  async function saveBlob(blob, suggestedName) {
+    if (window.showSaveFilePicker) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName,
+          types: [{ description: 'File', accept: { [blob.type || 'application/octet-stream']: ['.bin'] } }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return;
+      } catch (e) {
+        // If the user cancelled the file picker, stop and do not fall back to anchor download.
+        // Different browsers report different error names; treat common cancellation names as cancellation.
+        const name = e && e.name ? e.name : '';
+        const msg = e && e.message ? e.message : '';
+        if (name === 'AbortError' || name === 'NotAllowedError' || name === 'SecurityError' || /cancel/i.test(msg)) {
+          return; // user cancelled
+        }
+        // otherwise fallthrough to anchor download
+      }
+    }
+  const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = suggestedName || 'download.bin';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 5000);
+  }
+
+  const downloadAndSave = async (url) => {
+    if (!url) return;
+    setDownloading(url);
+    try {
+      // 1) Try direct fetch (no auth on cross-origin -> no preflight; requires S3 CORS)
+      try {
+        const opts = { method: 'GET', mode: 'cors', credentials: 'omit' };
+        // Only send auth when hitting same-origin or your API
+        if (isSameOrApiOrigin(url)) {
+          const headers = {};
+          const stored = localStorage.getItem('pronily:auth:token');
+          if (stored) headers['Authorization'] = `Bearer ${stored.replace(/^bearer\s+/i, '').trim()}`;
+          else if (import.meta.env.VITE_API_AUTH_TOKEN) headers['Authorization'] = import.meta.env.VITE_API_AUTH_TOKEN;
+          opts.headers = headers;
+          opts.credentials = 'include';
+        }
+
+        const res = await fetch(url, opts);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        await saveBlob(blob, getFilenameFromHeadersOrUrl(res, url));
+        return; // success
+      } catch (err) {
+        console.warn('Direct fetch failed (likely CORS). Will try proxy.', err);
+      }
+
+      // 2) Proxy (works even if S3 has no CORS). Make sure this route exists!
+      try {
+        const proxyUrl = `${(API_BASE || '').replace(/\/$/, '')}/characters/media/download-proxy?url=${encodeURIComponent(url)}&name=${encodeURIComponent(getFilenameFromUrl(url))}`;
+        // include Authorization for proxy calls (proxy is same/API origin and may require auth)
+        const proxyHeaders = {};
+        try {
+          const stored = localStorage.getItem('pronily:auth:token');
+          if (stored) proxyHeaders['Authorization'] = `Bearer ${stored.replace(/^bearer\s+/i, '').trim()}`;
+          else if (import.meta.env.VITE_API_AUTH_TOKEN) proxyHeaders['Authorization'] = import.meta.env.VITE_API_AUTH_TOKEN;
+        } catch (e) {
+          // ignore
+        }
+
+        const pres = await fetch(proxyUrl, { method: 'GET', credentials: 'omit', headers: proxyHeaders });
+        if (!pres.ok) {
+          const txt = await pres.text().catch(() => null);
+          console.error('Proxy response status/text:', pres.status, txt);
+          throw new Error(`Proxy HTTP ${pres.status}`);
+        }
+        const blob = await pres.blob();
+        await saveBlob(blob, getFilenameFromHeadersOrUrl(pres, url));
+        return;
+      } catch (err2) {
+        console.error('Proxy fetch failed:', err2);
+        alert('Download failed. Ensure S3 CORS is set OR the /characters/media/download-proxy route is enabled. Check proxy auth and logs.');
+      }
+    } finally {
+      setDownloading(null);
+    }
+  };
 
   useEffect(() => {
   const CACHE_KEY = 'pronily:gallery:cache';
@@ -159,12 +328,25 @@ export default function Gallery() {
   return (
     <section className="w-full max-w-7xl mx-auto rounded-2xl border border-white/10 bg-white/[.03] p-6 sm:p-8">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-semibold">Gallery</h1>
-      </div>
+        <div className="flex items-center gap-3">
+          <button
+            className="grid h-9 w-9 place-items-center rounded-full border border-white/10 hover:bg-white/5"
+            onClick={() => navigate(-1)}
+            aria-label="Back"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <h1 className="text-xl font-semibold">Gallery</h1>
+        </div>
 
-      <div className="mb-4 flex gap-2">
-        <button onClick={() => window.location.reload()} className="px-3 py-1 rounded bg-white/5">Reload page</button>
-        <button onClick={() => { console.log('Gallery: manual reload'); setItems([]); setLoading(true); setError(null); const ev = new Event('gallery:reload'); window.dispatchEvent(ev); }} className="px-3 py-1 rounded bg-white/5">Reload</button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { console.log('Gallery: manual reload'); setItems([]); setLoading(true); setError(null); const ev = new Event('gallery:reload'); window.dispatchEvent(ev); }}
+            className="px-3 py-1 rounded bg-white/5"
+          >
+            Refresh Gallery
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -175,10 +357,19 @@ export default function Gallery() {
         <div className="text-center text-white/60">No media yet.</div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {items.map((it) => (
-            <Thumb key={it.id} item={it} onOpen={(i) => setViewer(i)} />
-          ))}
-        </div>
+            {items.map((it) => {
+              const itUrl = getMediaUrl(it);
+              return (
+                <Thumb
+                  key={it.id}
+                  item={it}
+                  onOpen={(i) => setViewer(i)}
+                  onDownload={(url) => downloadAndSave(url)}
+                  isDownloading={!!(downloading && itUrl && downloading === itUrl)}
+                />
+              );
+            })}
+          </div>
       )}
 
       {viewer && (
@@ -186,7 +377,19 @@ export default function Gallery() {
           <div className="max-w-[90vw] max-h-[90vh] w-full">
             <div className="mb-3 text-right">
               <button onClick={() => { setViewer(null); }} className="px-3 py-1 rounded bg-white/5">Close</button>
-              <a href={getMediaUrl(viewer) || '#'} download className="ml-2 px-3 py-1 rounded bg-white/5">Download</a>
+              {(() => {
+                const viewerUrl = getMediaUrl(viewer);
+                const isCurDownloading = !!(viewerUrl && downloading && downloading === viewerUrl);
+                return (
+                  <button
+                    onClick={() => viewerUrl && downloadAndSave(viewerUrl)}
+                    className="ml-2 px-3 py-1 rounded bg-white/5"
+                    disabled={!viewerUrl || isCurDownloading}
+                  >
+                    {isCurDownloading ? <span className="inline-flex items-center gap-2"><IconSpinner className="w-4 h-4 text-white animate-spin" />Downloading…</span> : 'Download'}
+                  </button>
+                );
+              })()}
             </div>
             {((viewer.mime_type || viewer.content_type || '').toString().startsWith('video')) ? (
               <video src={getMediaUrl(viewer)} controls autoPlay className="w-full h-auto max-h-[80vh] bg-black" />

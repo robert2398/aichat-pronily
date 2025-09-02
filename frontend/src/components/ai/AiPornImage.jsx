@@ -152,6 +152,15 @@ export default function AiPornImage() {
   const handleGenerate = async () => {
     setError(null);
     setResponseData(null);
+    // If user is not signed in (no stored token) redirect to sign-in and
+    // preserve the current location so SignIn can navigate back after auth.
+    try {
+      const storedToken = localStorage.getItem('pronily:auth:token');
+      if (!storedToken) {
+        navigate('/signin', { state: { background: location } });
+        return;
+      }
+    } catch (e) {}
     if (!character || !character.id) {
       setError('Please select a character before generating.');
       return;

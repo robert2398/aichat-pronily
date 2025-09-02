@@ -38,7 +38,7 @@ import CreateCharacter from "./components/CreateCharacter";
 import CreateCharacterSave from "./components/CreateCharacterSave";
 import Gallery from "./components/ai/Gallery";
 import Settings from "./components/Settings";
-import ChangePassword from "./components/ChangePassword";
+import ChangePassword from "./components/auth/ChangePassword";
 import { Routes, Route } from "react-router-dom";
 import { useLocation } from "react-router-dom";
 

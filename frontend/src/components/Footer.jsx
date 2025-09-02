@@ -13,8 +13,8 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-10">
         <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
           <div>
-            <a href="#home" className="inline-flex items-center gap-2" aria-label="Pronily home" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
-              <img src="/img/Logo.svg" alt="Pronily" className="h-8 w-auto" />
+        <a href="#home" className="inline-flex items-center gap-2" aria-label="Triple Minds home" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
+          <img src="/img/tripleminds_logo.jpg" alt="Triple Minds" className="h-8 w-auto" />
             </a>
             <p className="mt-4 max-w-xs text-sm text-white/70">
               Lorem Ipsum is simply dummy text of the printing and typesetting industry.
@@ -43,10 +43,10 @@ export default function Footer() {
           <div>
             <h5 className="text-lg font-semibold">Social Media</h5>
             <ul className="mt-4 space-y-3 text-sm text-white/80">
-              <SocialLink href="#" icon={Instagram} label="Pronily AI on Instagram" />
-              <SocialLink href="#" icon={Facebook} label="Pronily AI on Facebook" />
-              <SocialLink href="#" icon={Twitter} label="Pronily AI on Twitter" />
-              <SocialLink href="#" icon={Instagram} label="Pronily AI on Instagram" />
+              <SocialLink href="#" icon={Instagram} label="Triple Minds on Instagram" />
+              <SocialLink href="#" icon={Facebook} label="Triple Minds on Facebook" />
+              <SocialLink href="#" icon={Twitter} label="Triple Minds on Twitter" />
+              <SocialLink href="#" icon={Instagram} label="Triple Minds on Instagram" />
             </ul>
           </div>
         </div>

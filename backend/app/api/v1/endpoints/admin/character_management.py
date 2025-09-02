@@ -9,7 +9,7 @@ from app.schemas.character import CharacterCreate, CharacterRead
 from app.api.v1.deps import get_current_user
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.services.characters import generate_image
+from app.services.character_media import generate_image
 from app.core.aws_s3 import generate_presigned_url
 from app.services.app_config import get_config_value_from_cache
 from typing import List, Dict

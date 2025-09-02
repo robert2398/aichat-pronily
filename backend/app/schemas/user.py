@@ -68,3 +68,15 @@ class SetPasswordRequest(BaseModel):
     uid: int
     token: str
     password: str = Field(..., min_length=8)
+
+
+
+# Pydantic schema for profile upsert
+class ProfileUpsertRequest(BaseModel):
+    full_name: Optional[str] = None
+    # support both `email` (common) and `email_id` (legacy) fields
+    email: Optional[EmailStr] = None
+    email_id: Optional[EmailStr] = None
+    username: Optional[str] = Field(None, max_length=150)
+    gender: Optional[str] = Field(None, max_length=32)
+    birth_date: Optional[str] = None  # ISO date string YYYY-MM-DD

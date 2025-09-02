@@ -4,25 +4,25 @@ Character endpoints for AI Friend Chatbot.
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 from sqlalchemy import func, select, delete, insert, cast, String
-from app.schemas.character_media import ImageCreate
+from app.schemas.character_media import ImageCreate, VideoCreate
 from app.api.v1.deps import get_current_user
 from app.core.database import get_db
 from app.models.character_media import CharacterMedia
 from app.models.user import User
 from app.core.config import settings
 from app.core.aws_s3 import upload_to_s3_file, get_file_from_s3_url
-from app.services.character_media import build_image_prompt, fetch_image_as_base64
-from app.services.characters import generate_image, generate_filename_timestamped
+from app.services.character_media import build_image_prompt, fetch_image_as_base64,\
+                generate_image, generate_filename_timestamped, generate_video
 from app.core.aws_s3 import generate_presigned_url
 from app.services.app_config import get_config_value_from_cache
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import List
-import requests
-import os
 import base64
 from io import BytesIO
-from PIL import Image
 import asyncio
+import requests
+import httpx
+
+from fastapi.responses import StreamingResponse
 
 router = APIRouter()
 
@@ -109,6 +109,67 @@ async def create_image(
         status_code=200,
     )
 
+@router.post("/create-video")
+async def create_video(
+    video: VideoCreate,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    
+    # Convert input image to base64 once
+    # base64_image = await fetch_image_as_base64(image.image_s3_url)
+
+    response = await generate_video(video.prompt, video.duration, 
+                                    video.pose, video.negative_prompt)
+    if response.status_code != 200:
+        raise HTTPException(status_code=500, detail="Video generation failed")
+    # json_resp = {"status": "Successfully created video",
+    # "data": {"video_url": "https://pornai0001.s3.amazonaws.com/videos/video_68b6fd55dfed14.35141648.mp4",
+    # "info": {"ckpt_name":"t2v","pos_prompt":"Ainematic short video of two young couples, all 18+, on a secluded beach at sunset. Couple 1: a male with a muscular build, tanned skin, and a thick, erect penis; a female with a curvy body, full breasts, and a shaved vulva. Couple 2: a male with an athletic frame, veiny erect penis; a female with a slim figure, small breasts, and trimmed vulva. Couple 1 in missionary, her legs wrapped around him; Couple 2 in doggy style, her back arched. Camera pans slowly from a wide ocean view to close-ups of their passionate movements. Mood: sensual, raw.","width":720,"height":1280,"duration":5},
+    # "server": "t2v",
+    # "created_at": "2025-09-02T14:21:10.345986Z"}}
+    
+    
+    json_resp = response.json()
+    print(json_resp["data"]["video_url"])
+    
+    url = json_resp["data"]["video_url"]
+    r = requests.get(url, stream=True, timeout=60)
+    r.raise_for_status()
+    r.raw.decode_content = True
+
+    user_role = (user.role if user else "USER").lower()
+    user_id = str(user.id)
+
+    filename = await generate_filename_timestamped(video.name)
+    s3_key = f"video/{user_role}/{user_id}/{filename}.mp4"
+    bucket_name = await get_config_value_from_cache("AWS_BUCKET_NAME")
+    s3_key, presigned_s3_url = await upload_to_s3_file(
+        file_obj=r.raw,
+        s3_key=s3_key,
+        content_type="video/mp4",
+        bucket_name=bucket_name,
+    )
+    
+    db_character_media = CharacterMedia(
+            user_id=user.id,
+            character_id=video.character_id,
+            media_type="video",
+            s3_path= s3_key
+        )
+    db.add(db_character_media)
+    await db.commit()
+    await db.refresh(db_character_media)
+
+    return JSONResponse(
+        content={
+            "message": "Images created successfully",
+            "video_path": presigned_s3_url,
+        },
+        status_code=200,
+    )
+
+
 @router.get("/get-users-character-media", status_code=200)
 async def get_users_character_images(
     user=Depends(get_current_user),
@@ -140,11 +201,36 @@ async def get_users_character_images(
         status_code=200,
     )
 
-@router.get("/get-default-character-images", status_code=200)
-async def get_default_character_images(
+@router.get("/download-proxy")
+async def download_proxy(url: str, name: str | None = None):
+    filename = name or "download.bin"
+
+    async def body_iter():
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=None) as client:
+                # Open and KEEP the stream INSIDE the generator
+                async with client.stream("GET", url) as r:
+                    # raise if 4xx/5xx before we start yielding
+                    r.raise_for_status()
+                    async for chunk in r.aiter_bytes():
+                        yield chunk
+        except Exception as e:
+            # Do NOT re-raise from inside the generator; just end the stream.
+            print("download-proxy stream error:", e)
+
+    headers = {
+        "Content-Type": "application/octet-stream",
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        # Add Cache-Control as you like; CORS is typically handled by middleware
+        "Cache-Control": "no-store",
+    }
+    return StreamingResponse(body_iter(), headers=headers)
+ 
+@router.get("/get-default-character-media", status_code=200)
+async def get_default_character_media(
     db: AsyncSession = Depends(get_db)
 ):
-    # Fetch images uploaded by users with role 'ADMIN' (case-insensitive)
+    # Fetch media uploaded by users with role 'ADMIN' (case-insensitive)
     stmt = (
         select(CharacterMedia)
         .join(User, CharacterMedia.user_id == User.id)
@@ -152,14 +238,14 @@ async def get_default_character_images(
         .where(func.lower(cast(User.role, String)) == "admin")
         .order_by(CharacterMedia.created_at.desc())
     )
-    images = await db.execute(stmt)
-    image_list = images.scalars().all()
-    if not image_list:
-        raise HTTPException(status_code=404, detail="No images found")
+    media = await db.execute(stmt)
+    media_list = media.scalars().all()
+    if not media_list:
+        raise HTTPException(status_code=404, detail="No media found")
     # Convert ORM objects to JSON-serializable dicts
-    images_serialized = []
-    for im in image_list:
-        images_serialized.append({
+    media_serialized = []
+    for im in media_list:
+        media_serialized.append({
             "id": im.id,
             "character_id": im.character_id,
             "user_id": im.user_id,
@@ -171,8 +257,8 @@ async def get_default_character_images(
 
     return JSONResponse(
         content={
-            "message": "Images retrieved successfully",
-            "images": images_serialized,
+            "message": "Media retrieved successfully",
+            "media": media_serialized,
         },
         status_code=200,
     )

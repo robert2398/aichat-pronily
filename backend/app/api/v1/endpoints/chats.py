@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from app.schemas.chat import ChatCreate, MessageCreate, MessageRead
 from app.models.chat import ChatMessage
 from app.models.character import Character
-from app.services.characters import get_headers_api
+from app.services.character_media import get_headers_api
 from app.services.chat import generate_chat, approximate_token_count                 
 from app.api.v1.deps import get_current_user
 from app.core.database import get_db

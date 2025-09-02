@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+  "dev": "vite",
+  "proxy": "node server/index.js",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
@@ -17,6 +18,9 @@
     "react-router-dom": "^6.30.1"
   },
   "devDependencies": {
+  "cors": "^2.8.5",
+  "express": "^4.18.2",
+  "node-fetch": "^3.4.1",
   "framer-motion": "^10.12.16",
     "@eslint/js": "^9.33.0",
     "@tailwindcss/postcss": "^4.1.12",

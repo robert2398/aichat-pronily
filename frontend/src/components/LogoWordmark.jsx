@@ -3,7 +3,7 @@ export default function LogoWordmark() {
   return (
     <div className="text-lg font-semibold tracking-tight leading-none">
       <span className="bg-gradient-to-r from-white via-white to-white/80 bg-clip-text text-transparent">
-        Pronily
+        Triple Minds
       </span>
     </div>
   );

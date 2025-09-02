@@ -2,7 +2,7 @@
 User SQLAlchemy model.
 """
 import enum as python_enum
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Enum, Date, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.models.base import Base
@@ -28,10 +28,10 @@ class User(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
+    # user relations
     subscriptions = relationship("Subscription", back_populates="user")
     promo_redemptions = relationship("PromoRedemption", back_populates="user")
     activation_tokens = relationship("UserActivation", back_populates="user", cascade="all, delete-orphan")
-    
     # wallet and coin relations
     user_wallet = relationship("UserWallet", back_populates="user", uselist=False)
     coin_transactions = relationship("CoinTransaction", back_populates="user")
@@ -44,7 +44,35 @@ class User(Base):
         passive_deletes=True,
     )
 
+    # one-to-one profile relation
+    profile = relationship("UserProfile", back_populates="user", uselist=False)
 
 
+class UserProfile(Base):
+    __tablename__ = "user_profiles"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    full_name = Column(Text, nullable=True)
+    email_id = Column(Text, nullable=True)
+    username = Column(String(150), nullable=True, unique=True)
+    gender = Column(String(32), nullable=True)
+    birth_date = Column(Date, nullable=True)
+    profile_image_url = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    user = relationship("User", back_populates="profile")
+
+
+class UserActivation(Base):
+    __tablename__ = "user_activations"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token_hash = Column(String, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    consumed_at = Column(DateTime(timezone=True))
+    
+    user = relationship("User", back_populates="activation_tokens")
 
 

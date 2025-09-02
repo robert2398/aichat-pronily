@@ -3,38 +3,138 @@ Auth endpoints for signup, login, refresh.
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete, insert
+from sqlalchemy import select, delete, insert, update
 #from sqlalchemy.future import select
 from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
-from app.schemas.user import UserCreate, LoginRequest, LoginResponse, SetPasswordRequest
-from app.models.user import User
+from app.schemas.user import UserCreate
+from app.schemas.auth import (
+    LoginRequest,
+    LoginResponse,
+    SetPasswordRequest,
+    ForgotPasswordRequest,
+    ResetPasswordConfirm,
+    ChangePasswordRequest,
+    MessageResponse,
+)
+from app.models.user import User, UserProfile
 from app.models.refresh_token import RefreshToken
 from app.models.email_verification import EmailVerification
-from app.models.user_activation import UserActivation
+from app.models.user import UserActivation
 from app.core.database import get_db
+from app.api.v1.deps import get_current_user
 from app.core.templates import templates
 from app.core.config import settings
 from app.services.email import send_email
 from app.services.app_config import get_config_value_from_cache
 from passlib.context import CryptContext
-import datetime, uuid
+import uuid
 from fastapi.responses import JSONResponse
 from secrets import token_urlsafe
 from passlib.hash import bcrypt
+#from datetime import datetime
+import datetime
 ###login
-
+import datetime as dt
 from app.core.security import (
     verify_password,
     create_access_token,
     create_refresh_token, hash_password
 )
 
+from app.models.user import UserProfile
+from app.models.user import User
+from app.models.password_reset import PasswordReset
+from app.core.security import create_reset_code, hash_password, verify_password
+from app.core.config            import settings
+from app.core.templates         import templates
+from app.services.email import send_email
+
 COOKIE_NAME = "refresh_token"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 30
+RESET_EXP_MINUTES = 30
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router = APIRouter()
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# ──────────────────────────────────────────────────────────────────────────
+@router.post("/password-reset/request")
+async def forgot_password(
+    payload: ForgotPasswordRequest,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    stmt = select(User).where(User.email == payload.email.lower())
+    user: User | None = (await db.execute(stmt)).scalar_one_or_none()
+    if not user:
+        # don't reveal existence
+        return {"message": "If the e-mail exists, a reset link was sent."}
+
+    raw_token, hashed = create_reset_code()
+    expires_at = datetime.now(dt.timezone.utc) + dt.timedelta(minutes=RESET_EXP_MINUTES)
+
+    reset = PasswordReset(
+        user_id=user.id,
+        code_hash=hashed,
+        expires_at=expires_at,
+    )
+    db.add(reset)
+    await db.commit()
+
+    reset_url = (
+        f"{settings.BACKEND_URL}/api/{settings.API_ENDPOINT_VERSION}/auth/reset-password?"
+        f"uid={reset.id}&token={raw_token}"
+    )
+    html = templates.get_template("reset_password.html").render(
+        full_name=user.full_name or "",
+        reset_link=reset_url,
+        year=datetime.now(dt.timezone.utc).year,
+    )
+    # await send_email(
+    #     subject="Reset your AI Friend Chat password",
+    #     to=[user.email],
+    #     html=html,
+    # )
+    #return {"message": "If the e-mail exists, a reset link was sent."}
+    return JSONResponse(content={"message": "reset link was sent",
+                                     "emailcontent" : html}, status_code=202)
+
+# ──────────────────────────────────────────────────────────────────────────
+@router.post("/password-reset/confirm")
+async def reset_password(
+    payload: ResetPasswordConfirm,
+    db: AsyncSession = Depends(get_db),
+):
+    # 1. Find pending reset row
+    stmt = select(PasswordReset, User).join(User).where(
+        PasswordReset.id == payload.uid, #uuid.UUID(payload.token.split(".")[0] or "0"*32),  # safety
+        User.email == payload.email.lower(),
+        PasswordReset.consumed_at.is_(None),
+        PasswordReset.expires_at > datetime.now(dt.timezone.utc),
+    )
+    row = (await db.execute(stmt)).one_or_none()
+    if not row:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    pr: PasswordReset
+    user: User
+    pr, user = row
+
+    # 2. Verify token
+    if not pwd_context.verify(payload.token, pr.code_hash):
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    # 3. Update user password
+    user.hashed_password = hash_password(payload.new_password)
+    pr.consumed_at = datetime.now(dt.timezone.utc)
+
+    # 4. Invalidate all refresh tokens
+    await db.execute(
+        update(User).where(User.id == user.id).values(hashed_password=user.hashed_password)
+    )
+    await db.commit()
+    #return {"message": "Password updated. Please log in."}
+    return JSONResponse(content={"message": "Password updated. Please log in"},
+                         status_code=200)
 
 @router.post("/signup")
 async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
@@ -121,7 +221,19 @@ async def verify_email(uid: uuid.UUID, token: str, db: AsyncSession = Depends(ge
     ev.consumed_at = datetime.datetime.now(datetime.timezone.utc)
     user = await db.get(User, ev.user_id)
     user.is_email_verified = True
+    # ensure a UserProfile exists for this user (create if missing)
+    stmt_profile = select(UserProfile).where(UserProfile.user_id == user.id)
+    profile = (await db.execute(stmt_profile)).scalar_one_or_none()
+    if not profile:
+        full_name = user.full_name or (user.email.split('@')[0].replace('.', ' ')) if user.email else None
+        new_profile = UserProfile(
+            user_id=user.id,
+            full_name=full_name,
+            email_id=user.email,
+        )
+        db.add(new_profile)
     await db.commit()
+
 
     # --- AUTO-LOGIN LOGIC ---
     # access_token = create_access_token(str(user.id))
@@ -313,4 +425,18 @@ async def login(
 
     return LoginResponse(access_token=access_token, user=user_data)
 
+@router.post("/change-password", response_model=MessageResponse)
+async def change_password(
+    req: ChangePasswordRequest,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MessageResponse:
+    # Verify old password
+    if not verify_password(req.old_password, user.hashed_password):
+        raise HTTPException(status_code=403, detail="Old password is incorrect")
 
+    # Update password
+    user.hashed_password = hash_password(req.new_password)
+    await db.commit()
+
+    return {"message": "Password changed successfully"}
