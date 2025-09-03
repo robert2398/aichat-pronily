@@ -32,18 +32,18 @@ interface SidebarProps {
 }
 
 const navItems = [
-  { label: 'Dashboard', id: 'dashboard', path: '/dashboard', icon: HomeIcon },
-  { label: 'User Management', id: 'users', path: '/users', icon: PeopleIcon },
-  { label: 'Payment Gateway', id: 'subscriptions', path: '/subscriptions', icon: MoneyIcon },
-  { label: 'Pricing Management', id: 'pricing', path: '/pricing', icon: PricingIcon },
-  { label: 'Promo Management', id: 'promo', path: '/promo', icon: TagIcon },
-  { label: 'Content Moderation', id: 'content-moderation', path: '/content-moderation', icon: SecurityIcon },
-  { label: 'Character Management', id: 'characters', path: '/characters', icon: PeopleIcon },
-  { label: 'Push Notification', id: 'notification', path: '/notification', icon: NotificationsIcon },
-  { label: 'Setting & Configuration', id: 'settings', path: '/settings', icon: SettingsIcon },
-  { label: 'APIs Management', id: 'apis', path: '/apis', icon: CodeIcon },
-  { label: 'Code Injections', id: 'code-injections', path: '/code-injections', icon: BoltIcon },
-  { label: 'Admin login & access', id: 'admin', path: '/admin', icon: AdminIcon },
+  { label: 'Dashboard', id: 'dashboard', path: '/admin/dashboard', icon: HomeIcon },
+  { label: 'User Management', id: 'users', path: '/admin/users', icon: PeopleIcon },
+  { label: 'Payment Gateway', id: 'subscriptions', path: '/admin/subscriptions', icon: MoneyIcon },
+  { label: 'Pricing Management', id: 'pricing', path: '/admin/pricing', icon: PricingIcon },
+  { label: 'Promo Management', id: 'promo', path: '/admin/promo', icon: TagIcon },
+  { label: 'Content Moderation', id: 'content-moderation', path: '/admin/content-moderation', icon: SecurityIcon },
+  { label: 'Character Management', id: 'characters', path: '/admin/characters', icon: PeopleIcon },
+  { label: 'Push Notification', id: 'notification', path: '/admin/notification', icon: NotificationsIcon },
+  { label: 'Setting & Configuration', id: 'settings', path: '/admin/settings', icon: SettingsIcon },
+  { label: 'APIs Management', id: 'apis', path: '/admin/apis', icon: CodeIcon },
+  { label: 'Code Injections', id: 'code-injections', path: '/admin/code-injections', icon: BoltIcon },
+  { label: 'Admin login & access', id: 'admin', path: '/admin/admin', icon: AdminIcon },
 ];
 
 export const Sidebar: React.FC<SidebarProps> = ({ 
@@ -85,11 +85,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   px: 2,
                   py: 1.5,
                   minHeight: 48,
-                  bgcolor: isActive ? '#ffc54d' : 'transparent',
-                  color: isActive ? 'black' : 'grey.700',
+                  bgcolor: isActive ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+                  color: isActive ? theme.palette.primary.main : 'grey.700',
                   boxShadow: isActive ? 1 : 0,
                   '&:hover': {
-                    bgcolor: isActive ? '#ffc54d' : alpha(theme.palette.grey[500], 0.1),
+                    bgcolor: isActive ? alpha(theme.palette.primary.main, 0.10) : alpha(theme.palette.grey[500], 0.1),
                   },
                   transition: 'all 0.2s ease-in-out'
                 }}

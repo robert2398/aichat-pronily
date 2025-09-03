@@ -38,6 +38,7 @@ export interface APIPricingPlan {
   plan_name: string;
   pricing_id: string;
   currency?: string;
+  discount?: number;
   price: number;
   billing_cycle: string;
   coin_reward: number;
@@ -51,6 +52,7 @@ export interface PricingPlan {
   plan_name: string;
   pricing_id: string;
   currency?: string;
+  discount?: number;
   price: number;
   billing_cycle: string;
   coin_reward: number;
@@ -62,6 +64,8 @@ export interface APIPromo {
   promo_id: number;
   promo_name: string;
   coupon: string;
+  stripe_promotion_id?: string;
+  stripe_coupon_id?: string;
   percent_off: number;
   start_date: string;
   expiry_date: string;
@@ -75,6 +79,8 @@ export interface Promo {
   promo_id: number;
   promo_name: string;
   coupon: string;
+  stripe_promotion_id?: string;
+  stripe_coupon_id?: string;
   percent_off: number;
   start_date: string;
   expiry_date: string;
@@ -348,7 +354,8 @@ class APIService {
       plan_id: apiPlan.plan_id,
       plan_name: apiPlan.plan_name,
       pricing_id: apiPlan.pricing_id,
-      currency: apiPlan.currency,
+  currency: apiPlan.currency,
+  discount: apiPlan.discount ?? 0,
       price: apiPlan.price,
       billing_cycle: apiPlan.billing_cycle,
       coin_reward: apiPlan.coin_reward,
@@ -362,6 +369,8 @@ class APIService {
       promo_id: apiPromo.promo_id,
       promo_name: apiPromo.promo_name,
       coupon: apiPromo.coupon,
+  stripe_promotion_id: apiPromo.stripe_promotion_id,
+  stripe_coupon_id: apiPromo.stripe_coupon_id,
       percent_off: apiPromo.percent_off,
       start_date: apiPromo.start_date,
       expiry_date: apiPromo.expiry_date,
@@ -395,7 +404,8 @@ class APIService {
 
   async getPricingPlans(): Promise<PricingPlan[]> {
     try {
-      const response = await this.api.get<APIPricingPlan[]>('/admin/pricing/get-pricing');
+  // New public subscription endpoint
+  const response = await this.api.get<APIPricingPlan[]>('/subscription/get-pricing');
       return response.data.map(plan => this.transformPricingData(plan));
     } catch (error) {
       console.error('Error fetching pricing plans:', error);
@@ -425,7 +435,7 @@ class APIService {
     }
   }
 
-  async updatePricingPlan(planId: number, updates: { pricing_id?: string; price?: number; coin_reward?: number; status?: string }): Promise<{ success: boolean; message: string }> {
+  async updatePricingPlan(planId: number, updates: { pricing_id?: string; price?: number; coin_reward?: number; status?: string; discount?: number }): Promise<{ success: boolean; message: string }> {
     try {
       const response = await this.api.put<{ detail: string }>(`/admin/pricing/edit-pricing/${planId}`, updates);
       return { success: true, message: response.data.detail };
@@ -437,7 +447,8 @@ class APIService {
 
   async getPromos(): Promise<Promo[]> {
     try {
-      const response = await this.api.get<APIPromo[]>('/admin/pricing/get-promo');
+  // Use public subscription endpoint for promos
+  const response = await this.api.get<APIPromo[]>('/subscription/get-promo');
       return response.data.map(promo => this.transformPromoData(promo));
     } catch (error) {
       console.error('Error fetching promos:', error);

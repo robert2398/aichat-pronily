@@ -5,6 +5,7 @@ import { CssBaseline } from '@mui/material'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { DateRangeProvider } from './contexts/DateRangeContext'
 import './index.css'
+import './styles/admin.css'
 import App from './App.tsx'
 
 const theme = createTheme({

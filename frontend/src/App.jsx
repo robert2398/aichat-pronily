@@ -39,7 +39,25 @@ import CreateCharacterSave from "./components/CreateCharacterSave";
 import Gallery from "./components/ai/Gallery";
 import Settings from "./components/Settings";
 import ChangePassword from "./components/auth/ChangePassword";
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense } from 'react';
+import AdminLayout from './admin/AdminLayout';
+
+// Lazy-load admin pages from the admin subproject to preserve code-splitting
+const AdminDashboard = lazy(() => import('../admin/src/pages/Dashboard').then(mod => ({ default: mod.default || mod.Dashboard || mod.DashboardPage || Object.values(mod)[0] })));
+const AdminUsers = lazy(() => import('../admin/src/pages/Users').then(mod => ({ default: mod.Users || mod.default })));
+// The admin pages sometimes use named exports (e.g. `export const Characters`).
+// React.lazy expects a default export, so wrap the dynamic import and
+// return the named export as the module default when necessary.
+const AdminCharacters = lazy(() =>
+  import('../admin/src/pages/Characters').then((mod) => ({ default: mod.Characters || mod.default }))
+);
+const AdminSubscriptions = lazy(() => import('../admin/src/pages/Subscriptions').then(mod => ({ default: mod.Subscriptions || mod.default })));
+const AdminPricing = lazy(() => import('../admin/src/pages/PricingManagement').then(mod => ({ default: mod.PricingManagement || mod.default })));
+const AdminPromo = lazy(() => import('../admin/src/pages/PromoManagement').then(mod => ({ default: mod.PromoManagement || mod.default })));
+const AdminContentModeration = lazy(() => import('../admin/src/pages/ContentModeration').then(mod => ({ default: mod.ContentModeration || mod.default })));
+const AdminAPIs = lazy(() => import('../admin/src/pages/APIsManagement').then(mod => ({ default: mod.APIsManagement || mod.default })));
+const AdminSettings = lazy(() => import('../admin/src/pages/Settings').then(mod => ({ default: mod.Settings || mod.default })));
 import { useLocation } from "react-router-dom";
 
 export default function App() {
@@ -246,6 +264,20 @@ export default function App() {
             </main>
           }
         />
+
+        {/* Admin routes integrated into main router under /admin - uses global Header above and AdminLayout for sidebar */}
+        <Route path="/admin" element={<AdminLayout />}> 
+          <Route index element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="dashboard" element={<Suspense fallback={<div>Loading...</div>}><AdminDashboard /></Suspense>} />
+          <Route path="users" element={<Suspense fallback={<div>Loading...</div>}><AdminUsers /></Suspense>} />
+          <Route path="characters" element={<Suspense fallback={<div>Loading...</div>}><AdminCharacters /></Suspense>} />
+          <Route path="subscriptions" element={<Suspense fallback={<div>Loading...</div>}><AdminSubscriptions /></Suspense>} />
+          <Route path="pricing" element={<Suspense fallback={<div>Loading...</div>}><AdminPricing /></Suspense>} />
+          <Route path="promo" element={<Suspense fallback={<div>Loading...</div>}><AdminPromo /></Suspense>} />
+          <Route path="content-moderation" element={<Suspense fallback={<div>Loading...</div>}><AdminContentModeration /></Suspense>} />
+          <Route path="apis" element={<Suspense fallback={<div>Loading...</div>}><AdminAPIs /></Suspense>} />
+          <Route path="settings" element={<Suspense fallback={<div>Loading...</div>}><AdminSettings /></Suspense>} />
+        </Route>
         <Route
           path="/change-password"
           element={
@@ -287,7 +319,8 @@ export default function App() {
           }
         />
       </Routes>
-      <Footer />
+  {/* Don't show global Footer on admin routes (admin has own layout) */}
+  {!location.pathname.startsWith('/admin') && <Footer />}
 
       {/* Modal routes: these render on top when navigated with location.state.background */}
       {background && (

@@ -28,6 +28,8 @@ async def list_characters(
         select(
             Character.id,
             Character.user_id,
+            Character.username,
+            Character.bio,
             Character.name,
             Character.gender,
             Character.style,
@@ -45,7 +47,6 @@ async def list_characters(
             Character.relationship_type,
             Character.clothing,
             Character.special_features,
-            Character.user_query_instructions,
             Character.image_url_s3,
             Character.updated_at,
             Character.created_at,
@@ -68,14 +69,7 @@ async def edit_character(character_id: int, character_data: CharacterCreate, db:
     if not character:
         raise HTTPException(status_code=404, detail="Character not found")
 
-    # 1. Prepare image generation request
-    url_generate_image = await generate_image(character_data)
-
-    # 2. Send get generated image api request
-    is_image_generated, base64_image = await get_generated_image(url_generate_image)
-    
-    if not is_image_generated or not base64_image:
-        raise HTTPException(status_code=504, detail="Image generation timed out. Character could not be updated. Please try again.")
+    # Image generation/polling removed in this admin endpoint (functionality handled elsewhere).
 
     # Update all fields from character_data
     for field, value in character_data.model_dump().items():

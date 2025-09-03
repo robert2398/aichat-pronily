@@ -39,7 +39,8 @@ import {
 import { apiService } from '../services/api';
 import type { Promo } from '../services/api';
 
-export const PromoManagement: React.FC = () => {
+// Replace the named export declaration with a local const so we can export default later
+const PromoManagement: React.FC = () => {
   const [promos, setPromos] = useState<Promo[]>([]);
   const [filteredPromos, setFilteredPromos] = useState<Promo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -319,14 +320,14 @@ export const PromoManagement: React.FC = () => {
 
   if (loading) {
     return (
-      <Box sx={{ p: 3, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+      <Box sx={{ p: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 300 }}>
         <CircularProgress />
       </Box>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ p: 1 }}>
       <Box sx={{ mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 'bold', color: 'grey.900', mb: 1 }}>
           Promo Management
@@ -367,16 +368,31 @@ export const PromoManagement: React.FC = () => {
             />
             <Button
               variant="contained"
-              startIcon={<AddIcon />}
+              startIcon={<AddIcon sx={{ fontSize: 18 }} />}
               onClick={handleAddClick}
+              aria-label="Create new promo"
+              disableElevation
               sx={{
-                borderRadius: 2,
                 textTransform: 'none',
-                px: 3,
-                py: 1
+                fontWeight: 500,
+                fontSize: 13.5,
+                borderRadius: 9999,
+                px: 2,
+                py: 1,
+                height: 36,
+                minHeight: 36,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 1,
+                backgroundImage: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%)',
+                color: '#fff',
+                '&:hover': {
+                  filter: 'brightness(0.95)',
+                  backgroundImage: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%)'
+                }
               }}
             >
-              ADD PROMO
+              Add Promo
             </Button>
           </Box>
         </Box>
@@ -390,6 +406,8 @@ export const PromoManagement: React.FC = () => {
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Discount</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Start Date</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Expiry Date</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Stripe Promo ID</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Stripe Coupon ID</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Status</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Applied Count</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Last Updated</TableCell>
@@ -455,6 +473,16 @@ export const PromoManagement: React.FC = () => {
                   <TableCell>
                     <Typography variant="body2" sx={{ color: 'grey.600' }}>
                       {formatDate(promo.expiry_date)}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ color: 'grey.700', fontWeight: 500 }}>
+                      {promo.stripe_promotion_id || '—'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ color: 'grey.700', fontWeight: 500 }}>
+                      {promo.stripe_coupon_id || '—'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -555,15 +583,8 @@ export const PromoManagement: React.FC = () => {
         <DialogContent sx={{ px: 3 }}>
           {selectedPromo && (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 1 }}>
-              {/* Read-only fields */}
+              {/* Read-only/reference fields (excluding promo_id and created_at per request) */}
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-                <TextField
-                  label="Promo ID"
-                  value={selectedPromo.promo_id}
-                  disabled
-                  variant="outlined"
-                  size="small"
-                />
                 <TextField
                   label="Coupon Code"
                   value={selectedPromo.coupon}
@@ -571,15 +592,14 @@ export const PromoManagement: React.FC = () => {
                   variant="outlined"
                   size="small"
                 />
+                <TextField
+                  label="Applied Count"
+                  value={selectedPromo.applied_count}
+                  disabled
+                  variant="outlined"
+                  size="small"
+                />
               </Box>
-              
-              <TextField
-                label="Applied Count"
-                value={selectedPromo.applied_count}
-                disabled
-                variant="outlined"
-                size="small"
-              />
 
               {/* Editable fields */}
               <Typography variant="h6" sx={{ fontWeight: 600, mt: 2, color: 'primary.main' }}>
@@ -649,15 +669,15 @@ export const PromoManagement: React.FC = () => {
               {/* Read-only dates for reference */}
               <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mt: 2 }}>
                 <TextField
-                  label="Created At"
-                  value={formatDate(selectedPromo.updated_at)}
+                  label="Stripe Promo ID"
+                  value={selectedPromo.stripe_promotion_id || ''}
                   disabled
                   variant="outlined"
                   size="small"
                 />
                 <TextField
-                  label="Last Updated"
-                  value={formatDate(selectedPromo.updated_at)}
+                  label="Stripe Coupon ID"
+                  value={selectedPromo.stripe_coupon_id || ''}
                   disabled
                   variant="outlined"
                   size="small"
@@ -864,3 +884,5 @@ export const PromoManagement: React.FC = () => {
     </Box>
   );
 };
+
+export default PromoManagement;

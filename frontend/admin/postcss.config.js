@@ -1,6 +1,6 @@
 export default {
   plugins: {
-    tailwindcss: {},
+    // Tailwind was removed from the admin project. Keep autoprefixer only.
     autoprefixer: {},
   },
 }

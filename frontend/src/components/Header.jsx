@@ -371,7 +371,7 @@ export default function Header() {
 
                           {isAdmin && (
                             <button
-                              onClick={() => { navigate('/dashboard'); close(); }}
+                              onClick={() => { navigate('/admin/dashboard'); close(); }}
                               className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5"
                             >
                               Admin Dashboard
@@ -460,7 +460,7 @@ export default function Header() {
 
                   <div className="mt-2 grid gap-1 px-1">
                     {String(user?.role ?? "").toLowerCase() === 'admin' && (
-                      <a onClick={() => { setOpen(false); navigate('/admin'); }} className="block w-full text-left text-sm px-3 py-2 rounded-xl text-white/80 hover:bg-white/5">Admin Dashboard</a>
+                      <a onClick={() => { setOpen(false); navigate('/admin/dashboard'); }} className="block w-full text-left text-sm px-3 py-2 rounded-xl text-white/80 hover:bg-white/5">Admin Dashboard</a>
                     )}
                     <a onClick={() => { setOpen(false); openMyGallery(); }} className="block w-full text-left text-sm px-3 py-2 rounded-xl text-white/80 hover:bg-white/5">My Gallery</a>
                     <a onClick={() => { setOpen(false); handleLogout(); }} className="block w-full text-left text-sm px-3 py-2 rounded-xl text-rose-400 hover:bg-white/5">Logout</a>

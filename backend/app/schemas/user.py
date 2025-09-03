@@ -18,15 +18,14 @@ class UserCreate(UserBase):
 
 class UserRead(UserBase):
     id: int
-    full_name: str
+    full_name: Optional[str] = None
     role: str
     is_active: bool
     is_email_verified: bool
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
+    # Pydantic v2: enable parsing from ORM / attribute objects
+    model_config = {"from_attributes": True}
 
 class UserLogin(BaseModel):
     email: EmailStr

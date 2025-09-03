@@ -1,0 +1,199 @@
+/* Admin-only stylesheet
+   Purpose: keep admin page styling separate from the main project while
+   matching the project's theme (fonts, spacing, backgrounds, and colors).
+   This file should only affect the admin bundle.
+*/
+
+:root {
+  /* Project theme tokens (kept small and consistent with MUI theme) */
+  --tm-font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  --tm-bg: #f6f8fb; /* light page background used across project */
+  --tm-surface: #ffffff; /* cards / papers */
+  --tm-muted: #6b7280;
+  --tm-accent: #ffc54d; /* legacy admin accent (kept for fallbacks) */
+  /* preferred accent for admin actions: gradient matching main project 'Get started' */
+  --tm-accent-gradient: linear-gradient(90deg, #8b5cf6 0%, #ec4899 50%, #38bdf8 100%);
+  --tm-accent-plain: #ffc54d;
+  --tm-accent-plain-hover: #ffb929;
+}
+
+/* Ensure admin uses the same base font family as the site */
+html, body, #root {
+  font-family: var(--tm-font-family);
+  background: var(--tm-bg);
+  height: 100%;
+}
+
+/* Page container tweaks to align with project layout */
+.admin-page-root {
+  padding: 24px;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+/* Paper and card surfaces in admin should match project surface color */
+.admin-paper, .admin-card, .admin-table-container {
+  background: var(--tm-surface) !important;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(16,24,40,0.04);
+}
+
+/* Typography helpers used by Users page */
+.admin-title {
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: #0f172a;
+}
+
+.admin-muted {
+  color: var(--tm-muted);
+}
+
+/* Buttons: keep MUI variants but add project accent for primary admin actions */
+.admin-btn-accent {
+  /* Match the Create Character button color and sizing from Header.tsx */
+  background-color: var(--tm-accent-plain) !important;
+  color: #000 !important;
+  text-transform: none;
+  font-weight: 500;
+  border-radius: 8px;
+  padding: 8px 16px;
+  box-shadow: 0 1px 4px rgba(15,23,42,0.06);
+}
+.admin-btn-accent:hover {
+  background-color: var(--tm-accent-plain-hover) !important;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.08);
+}
+
+/* Table tweaks to make table rows and headers more consistent with theme */
+.admin-table thead th {
+  font-weight: 600;
+  color: #111827;
+  background: transparent;
+}
+.admin-table tbody tr:hover {
+  background: rgba(15,23,42,0.03);
+}
+
+/* Override admin sidebar inline yellow (#ffc54d) used by MUI sx when an item is active.
+   Because the sidebar uses inline styles, we force an override here scoped to admin root.
+*/
+[data-admin-root] .MuiListItemButton-root[style*="#ffc54d"] {
+  /* Replace the inline yellow with a subtle blue-tint active state so sidebar isn't orange */
+  background: rgba(25,118,210,0.08) !important; /* light blue tint */
+  color: #1565c0 !important; /* primary blue */
+  box-shadow: 0 1px 6px rgba(21,101,192,0.06) !important;
+}
+[data-admin-root] .MuiListItemButton-root[style*="#ffc54d"] .MuiListItemIcon-root > * {
+  color: #1565c0 !important;
+}
+[data-admin-root] .MuiListItemButton-root[style*="#ffc54d"]:hover {
+  background: rgba(25,118,210,0.10) !important;
+}
+
+/* Reduce font-size in the filters area so controls align well at 100% zoom */
+.admin-paper .MuiFormControl-root,
+.admin-paper .MuiInputBase-root,
+.admin-paper .MuiTextField-root,
+.admin-paper .MuiSelect-root,
+.admin-paper .MuiInputLabel-root {
+  font-size: 0.875rem;
+}
+.admin-paper .MuiInputBase-input {
+  font-size: 0.9rem;
+}
+
+/* Dialog header customizations to align with project brand */
+.admin-dialog-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+}
+
+/* Small helpers to scope to admin only (so global styles unchanged) */
+[data-admin-root] .admin-muted { color: var(--tm-muted); }
+
+/* Responsive adjustments for admin layout */
+@media (max-width: 900px) {
+  .admin-page-root { padding: 12px; }
+  .admin-table-container { min-width: 0 !important; }
+}
+
+/* User page specific styles to normalize filters and typography */
+.user-page .filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-page .filters-bar .MuiFormControl-root,
+.user-page .filters-bar .MuiInputBase-root,
+.user-page .filters-bar .MuiTextField-root,
+.user-page .filters-bar .MuiSelect-root,
+.user-page .filters-bar .MuiInputLabel-root,
+.user-page .filters-bar .MuiButton-root {
+  font-size: 14px !important; /* text-sm */
+  line-height: 1.25rem !important;
+  min-height: 36px !important; /* h-9 */
+  box-sizing: border-box !important;
+}
+
+.user-page .filters-bar .MuiInputBase-input,
+.user-page .filters-bar .MuiSelect-select {
+  font-size: 14px !important;
+  line-height: 1.25rem !important;
+  padding: 6px 12px !important; /* ensure consistent inner height */
+}
+
+/* Hard-normalize MUI small control box model for this page (tight, 36px controls) */
+.user-page .MuiFormControl-root.MuiFormControl-sizeSmall,
+.user-page .MuiTextField-root.MuiFormControl-sizeSmall,
+.user-page .MuiOutlinedInput-root.MuiInputBase-sizeSmall,
+.user-page .MuiSelect-root.MuiInputBase-sizeSmall {
+  min-height: 36px !important;
+}
+.user-page .MuiOutlinedInput-root.MuiInputBase-sizeSmall {
+  height: 36px !important;
+}
+.user-page .MuiOutlinedInput-root.MuiInputBase-sizeSmall .MuiOutlinedInput-input {
+  padding: 6px 12px !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+  height: 20px !important;
+}
+.user-page .MuiSelect-select.MuiSelect-select {
+  padding: 6px 12px !important;
+  display: flex !important;
+  align-items: center !important;
+  height: 36px !important;
+}
+
+/* Shrink the input label to avoid layout jumps */
+.user-page .MuiInputLabel-root.MuiInputLabel-shrink {
+  transform: translate(0, -6px) scale(0.85);
+}
+
+/* Make table body text slightly smaller and consistent on this page */
+.user-page .MuiTable-root,
+.user-page .MuiTableBody-root td,
+.user-page .MuiTableContainer-root {
+  font-size: 14px !important;
+}
+
+/* Ensure icon and text spacing on New User button is close to Create Character */
+.user-page .MuiButton-root[aria-label="Create new user"] {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  height: 36px !important;
+}
+/* Gradient pill for the New User button to match main site Create Character */
+.user-page .MuiButton-root[aria-label="Create new user"] {
+  border-radius: 9999px !important;
+  background-image: linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%) !important;
+  color: #fff !important;
+}
+
+.user-page .MuiButton-root[aria-label="Create new user"]:hover {
+  filter: brightness(0.95);
+}

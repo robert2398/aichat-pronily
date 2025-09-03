@@ -157,8 +157,7 @@ async def edit_character(
                     voice_type=character.voice_type,
                     relationship_type=character.relationship_type,
                     clothing=character.clothing,
-                    special_features=character.special_features,
-                    user_query_instructions=character.user_query_instructions)
+                    special_features=character.special_features)
     print('Prompt Generated:', prompt)
 
     # 1. Prepare image generation request
@@ -217,7 +216,6 @@ async def edit_character(
     db_character.voice_type = character.voice_type
     db_character.relationship_type = character.relationship_type
     db_character.special_features = character.special_features
-    db_character.user_query_instructions = character.user_query_instructions
     db_character.prompt = prompt
     db_character.image_url_s3 = s3_key
 

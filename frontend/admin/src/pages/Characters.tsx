@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
@@ -24,7 +25,7 @@ import {
   FormControl,
   InputLabel,
   Select,
-  Grid,
+  Stack,
   Card,
   CardContent
 } from '@mui/material';
@@ -33,6 +34,7 @@ import {
   Search as SearchIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
+  Add as AddIcon,
   FilterList as FilterListIcon
 } from '@mui/icons-material';
 import { apiService, type Character } from '../services/api';
@@ -50,7 +52,10 @@ export const Characters: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [_selectedCharacter, setSelectedCharacter] = useState<Character | null>(null);
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
+  const [expandedBios, setExpandedBios] = useState<Set<number>>(new Set());
   const fetchedPages = useRef<Set<string>>(new Set()); // Track which pages we've fetched
+
+  const navigate = useNavigate();
   
   // Edit modal states
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -274,7 +279,7 @@ export const Characters: React.FC = () => {
   console.log('Character Management - Page:', page + 1, 'Showing:', paginatedCharacters.length, 'of', filteredCharacters.length, 'total characters');
 
   return (
-    <Container maxWidth="xl" sx={{ py: 3 }}>
+    <Box data-admin-root className="admin-page-root user-page" sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ mb: 3 }}>
         <Typography 
           variant="h4" 
@@ -299,122 +304,130 @@ export const Characters: React.FC = () => {
 
       {/* Header Actions with Filters */}
       <Card sx={{ mb: 3, borderRadius: 2 }}>
-        <CardContent sx={{ pb: 2 }}>
-          <Grid container spacing={2} alignItems="center">
-            {/* Search Field */}
-            <Grid item xs={12} md={4}>
-              <TextField
-                placeholder="Search characters..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                size="small"
-                fullWidth
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon sx={{ color: 'grey.400' }} />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'grey.50',
-                    '&:hover': {
-                      backgroundColor: 'white',
-                    },
-                    '&.Mui-focused': {
-                      backgroundColor: 'white',
-                    }
-                  }
-                }}
-              />
-            </Grid>
+  <CardContent sx={{ pb: 2 }}>
+    <Stack
+      direction={{ xs: 'column', md: 'row' }}
+      spacing={2}
+      alignItems="center"
+      sx={{ flexWrap: { xs: 'wrap', md: 'nowrap' } }}
+    >
+      {/* Search – narrower (240px on md+) */}
+      <Box sx={{ width: { xs: '100%', md: 240 } }}>
+        <TextField
+          placeholder="Search characters..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          size="small"
+          fullWidth
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon sx={{ color: 'grey.400' }} />
+              </InputAdornment>
+            ),
+          }}
+          sx={{
+            '& .MuiOutlinedInput-root': {
+              backgroundColor: 'grey.50',
+              '&:hover': { backgroundColor: 'white' },
+              '&.Mui-focused': { backgroundColor: 'white' },
+            },
+          }}
+        />
+      </Box>
 
-            {/* Filters */}
-            <Grid item xs={12} md={8}>
-              <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <FilterListIcon sx={{ color: 'grey.600', fontSize: 20 }} />
-                  <Typography variant="body2" sx={{ color: 'grey.600', fontWeight: 500 }}>
-                    Filters:
-                  </Typography>
-                </Box>
+      {/* Filters label */}
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+        <FilterListIcon sx={{ color: 'grey.600', fontSize: 20 }} />
+        <Typography variant="body2" sx={{ color: 'grey.600', fontWeight: 500 }}>
+          Filters:
+        </Typography>
+      </Box>
 
-                {/* Created By Filter */}
-                <FormControl size="small" sx={{ minWidth: 120 }}>
-                  <InputLabel>Created By</InputLabel>
-                  <Select
-                    value={createdByFilter}
-                    onChange={(e) => setCreatedByFilter(e.target.value)}
-                    label="Created By"
-                  >
-                    <MenuItem value="">All</MenuItem>
-                    <MenuItem value="admin">Admin</MenuItem>
-                    <MenuItem value="user">User</MenuItem>
-                  </Select>
-                </FormControl>
+      {/* Created By */}
+      <Box sx={{ width: { xs: '100%', sm: 200, md: 170 } }}>
+        <FormControl size="small" fullWidth>
+          <InputLabel>Created By</InputLabel>
+          <Select value={createdByFilter} onChange={(e) => setCreatedByFilter(e.target.value)} label="Created By">
+            <MenuItem value="">All</MenuItem>
+            <MenuItem value="admin">Admin</MenuItem>
+            <MenuItem value="user">User</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
 
-                {/* User ID Filter */}
-                <TextField
-                  size="small"
-                  label="User ID"
-                  value={userIdFilter}
-                  onChange={(e) => setUserIdFilter(e.target.value)}
-                  sx={{ minWidth: 100 }}
-                  type="number"
-                  placeholder="Enter ID"
-                />
+      {/* User ID – narrower */}
+      <Box sx={{ width: { xs: '50%', sm: 140, md: 110 } }}>
+        <TextField
+          size="small"
+          label="User ID"
+          value={userIdFilter}
+          onChange={(e) => setUserIdFilter(e.target.value)}
+          type="number"
+          fullWidth
+        />
+      </Box>
 
-                {/* Date Range Filters */}
-                <TextField
-                  size="small"
-                  label="From Date"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ minWidth: 140 }}
-                />
+      {/* From / To */}
+      <Box sx={{ width: { xs: '50%', sm: 160, md: 150 } }}>
+        <TextField
+          size="small"
+          label="From Date"
+          type="date"
+          value={startDate}
+          onChange={(e) => setStartDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          fullWidth
+        />
+      </Box>
+      <Box sx={{ width: { xs: '50%', sm: 160, md: 150 } }}>
+        <TextField
+          size="small"
+          label="To Date"
+          type="date"
+          value={endDate}
+          onChange={(e) => setEndDate(e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          fullWidth
+        />
+      </Box>
 
-                <TextField
-                  size="small"
-                  label="To Date"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  sx={{ minWidth: 140 }}
-                />
+      {(createdByFilter || userIdFilter || startDate || endDate) && (
+        <Box sx={{ width: { xs: '50%', sm: 'auto' } }}>
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={() => { setCreatedByFilter(''); setUserIdFilter(''); setStartDate(''); setEndDate(''); }}
+            sx={{ color: 'grey.600', borderColor: 'grey.300',
+              '&:hover': { borderColor: 'error.main', backgroundColor: 'error.50', color: 'error.main' } }}
+          >
+            Clear
+          </Button>
+        </Box>
+      )}
 
-                {/* Clear Filters Button */}
-                {(createdByFilter || userIdFilter || startDate || endDate) && (
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    onClick={() => {
-                      setCreatedByFilter('');
-                      setUserIdFilter('');
-                      setStartDate('');
-                      setEndDate('');
-                    }}
-                    sx={{ 
-                      color: 'grey.600',
-                      borderColor: 'grey.300',
-                      '&:hover': {
-                        borderColor: 'error.main',
-                        backgroundColor: 'error.50',
-                        color: 'error.main'
-                      }
-                    }}
-                  >
-                    Clear Filters
-                  </Button>
-                )}
-              </Box>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+      {/* Create Character – WIDER and pinned right on md+ */}
+      <Box sx={{ ml: { md: 'auto' } }}>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon sx={{ fontSize: 18 }} />}
+          onClick={() => navigate('/create-character')}
+          aria-label="Create Character"
+          data-testid="create-character-btn"
+          disableElevation
+          sx={{
+            textTransform: 'none', fontWeight: 600, fontSize: 14, borderRadius: 9999,
+            px: 3.5, height: 40, minWidth: 180, color: '#fff',
+            backgroundImage: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%)',
+            '&:hover': { filter: 'brightness(0.95)', backgroundImage: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%)' },
+          }}
+        >
+          Create Character
+        </Button>
+      </Box>
+    </Stack>
+  </CardContent>
+</Card>
 
       {/* Characters Table */}
       <Paper 
@@ -427,54 +440,62 @@ export const Characters: React.FC = () => {
         }}
       >
         <TableContainer>
-          <Table>
+          <Table size="small" sx={{ tableLayout: 'fixed' }}>
             <TableHead>
               <TableRow sx={{ bgcolor: 'grey.50' }}>
-                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '20%' }}>Character</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '45%' }}>Character Details</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '22%' }}>Character</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '29%' }}>Character Details</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '27%' }}>Appearance & Personality</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '12%' }}>Created By</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '13%' }}>Updated Date</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '10%' }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '7%' }}>Updated Date</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '3%' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {paginatedCharacters.map((character) => (
+              {paginatedCharacters.map((character) => {
+                // Normalize backend variations for appearance_personality and bio (trimmed)
+                const ap = (character as any).appearance_personality ?? {};
+                const clothing        = String((character as any).clothing ?? ap.clothing ?? '').trim();
+                const features        = String((character as any).features ?? ap.features ?? '').trim();
+                const specialRaw      = (character as any).special_features ?? ap.special_features;
+                const specialFeatures = String(specialRaw == null ? '' : specialRaw).trim();
+                const personality     = String((character as any).personality ?? ap.personality ?? '').trim();
+                const voice           = String((character as any).voice_type ?? ap.voice ?? '').trim();
+                const relationship    = String((character as any).relationship_type ?? ap.relationship ?? '').trim();
+                const bio             = String((character as any).bio ?? (character as any).description ?? '').trim();
+
+                return (
+                <React.Fragment key={character.id}>
                 <TableRow 
-                  key={character.id}
                   sx={{ 
                     '&:hover': { bgcolor: 'grey.50' },
                     borderBottom: 1,
                     borderColor: 'grey.100',
-                    height: 240 // Increased height to accommodate larger 160px avatar and better spacing
                   }}
                 >
-                  <TableCell sx={{ width: '20%' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 3, py: 2 }}>
-                      {/* Larger Avatar taking more prominent space */}
+                  <TableCell sx={{ width: '20%', py: 1.25, pr: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
+                      {/* Avatar */}
                       <Avatar
                         src={!failedImages.has(character.id) && presignedUrls[character.id] ? presignedUrls[character.id] : undefined}
                         sx={{ 
-                          width: 160, 
-                          height: 160,
+                          width: 120, 
+                          height: 120,
                           bgcolor: (!failedImages.has(character.id) && presignedUrls[character.id]) ? 'transparent' : failedImages.has(character.id) ? '#ffebee' : 'grey.200',
                           color: failedImages.has(character.id) ? '#d32f2f' : 'grey.600',
-                          border: (!failedImages.has(character.id) && presignedUrls[character.id]) ? '3px solid #e0e0e0' : failedImages.has(character.id) ? '3px solid #ffcdd2' : 'none',
+                          border: (!failedImages.has(character.id) && presignedUrls[character.id]) ? '2px solid #e0e0e0' : failedImages.has(character.id) ? '2px solid #ffcdd2' : 'none',
                           objectFit: 'cover',
-                          fontSize: failedImages.has(character.id) ? '0.75rem' : '3rem',
+                          fontSize: failedImages.has(character.id) ? '0.7rem' : '2rem',
                           fontWeight: 600,
+                          borderRadius: 3,
                           flexShrink: 0,
-                          borderRadius: 3, // More rounded corners for better aesthetics
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: 'center',
-                          justifyContent: 'center'
                         }}
                         onError={() => handleImageError(character.id, character.name, character.image_url_s3 || undefined)}
                         onLoad={() => handleImageLoad(character.name)}
                       >
                         {failedImages.has(character.id) ? (
                           <>
-                            <Typography sx={{ fontSize: '2rem', mb: 0.5 }}>
+                            <Typography sx={{ fontSize: '1.6rem', mb: 0.5 }}>
                               {character.name.charAt(0).toUpperCase()}
                             </Typography>
                             <Typography sx={{ fontSize: '0.65rem', textAlign: 'center', fontWeight: 500 }}>
@@ -485,181 +506,97 @@ export const Characters: React.FC = () => {
                           character.name.charAt(0).toUpperCase()
                         ) : undefined}
                       </Avatar>
-                      
-                      {/* Character Info positioned to the right of avatar */}
-                      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'flex-start', gap: 1, pt: 1 }}>
-                        <Typography 
-                          variant="h6" 
-                          sx={{ 
-                            fontWeight: 700,
-                            color: 'grey.900',
-                            fontSize: '1.3rem',
-                            lineHeight: 1.2,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
+
+                      {/* Character Info */}
+                      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Typography sx={{ fontWeight: 600, color: 'grey.900', fontSize: '1rem', lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {character.name}
                         </Typography>
-                        
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              color: 'primary.main',
-                              fontSize: '1rem',
-                              fontWeight: 600
-                            }}
-                          >
+
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                          <Typography variant="body2" sx={{ color: 'primary.main', fontSize: '0.8rem', fontWeight: 600 }}>
                             ID: {character.id}
                           </Typography>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              color: 'secondary.main',
-                              fontSize: '1rem',
-                              fontWeight: 600
-                            }}
-                          >
+                          <Typography variant="body2" sx={{ color: 'secondary.main', fontSize: '0.8rem', fontWeight: 600 }}>
                             User ID: {character.user_id}
                           </Typography>
                         </Box>
-                        
-                        {/* Character details with larger fonts and better spacing */}
-                        <Box sx={{ mt: 1, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              color: 'grey.700',
-                              fontSize: '1rem',
-                              fontWeight: 500
-                            }}
-                          >
-                            {character.gender} • {character.age} years
+
+                        <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                          <Typography variant="body2" sx={{ color: 'grey.700', fontSize: '0.8rem', fontWeight: 500 }}>
+                            {character.age}
                           </Typography>
-                          <Typography 
-                            variant="body2" 
-                            sx={{ 
-                              color: 'grey.700',
-                              fontSize: '1rem'
-                            }}
-                          >
-                            {character.style} style
+                          <Typography variant="body2" sx={{ color: 'grey.700', fontSize: '0.8rem' }}>
+                            {character.style}
                           </Typography>
                         </Box>
                       </Box>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ width: '45%' }}>
-                    <Box sx={{ display: 'flex', gap: 2, height: '100%' }}>
-                      {/* Core Identity Column */}
-                      <Box sx={{ flex: 1, pr: 1 }}>
-                        <Typography 
-                          variant="subtitle2" 
-                          sx={{ 
-                            fontWeight: 600, 
-                            color: 'primary.main', 
-                            mb: 1,
-                            fontSize: '0.875rem',
-                            borderBottom: '2px solid',
-                            borderColor: 'primary.main',
-                            pb: 0.5
-                          }}
-                        >
-                          Core Identity
+                  {/* Character Details (core identity) - header label removed to save space */}
+                  <TableCell sx={{ width: '29%', py: 1.25, pr: 0 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.15 }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <strong>Ethnicity:</strong> {character.ethnicity}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <strong>Eyes:</strong> {character.eye_colour}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <strong>Hair:</strong> {character.hair_colour} {character.hair_style}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <strong>Body:</strong> {character.body_type}
+                      </Typography>
+                      {character.breast_size && (
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                          <strong>Breast:</strong> {character.breast_size}
                         </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            <strong>Ethnicity:</strong> {character.ethnicity}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            <strong>Eyes:</strong> {character.eye_colour}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            <strong>Hair:</strong> {character.hair_colour} {character.hair_style}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            <strong>Body:</strong> {character.body_type}
-                          </Typography>
-                          {character.breast_size && (
-                            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                              <strong>Breast:</strong> {character.breast_size}
-                            </Typography>
-                          )}
-                          {character.butt_size && (
-                            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                              <strong>Butt:</strong> {character.butt_size}
-                            </Typography>
-                          )}
-                          {character.dick_size && (
-                            <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                              <strong>Dick:</strong> {character.dick_size}
-                            </Typography>
-                          )}
-                        </Box>
-                      </Box>
+                      )}
+                      {character.butt_size && (
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                          <strong>Butt:</strong> {character.butt_size}
+                        </Typography>
+                      )}
+                      {character.dick_size && (
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                          <strong>Dick:</strong> {character.dick_size}
+                        </Typography>
+                      )}
+                    </Box>
+                  </TableCell>
 
-                      {/* Appearance Column */}
-                      <Box sx={{ 
-                        flex: 1, 
-                        pl: 1, 
-                        borderLeft: '1px solid', 
-                        borderColor: 'grey.200' 
-                      }}>
-                        <Typography 
-                          variant="subtitle2" 
-                          sx={{ 
-                            fontWeight: 600, 
-                            color: 'secondary.main', 
-                            mb: 1,
-                            fontSize: '0.875rem',
-                            borderBottom: '2px solid',
-                            borderColor: 'secondary.main',
-                            pb: 0.5
-                          }}
-                        >
-                          Appearance & Personality
+                  {/* Appearance & Personality using normalized values */}
+                  <TableCell sx={{ width: '27%', py: 1, pl: 0, pr: 1 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.15 }}>
+                      {clothing && (
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                          <strong>Clothing:</strong> {clothing}
                         </Typography>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            <strong>Clothing:</strong> {character.clothing}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            <strong>Features:</strong> {character.special_features}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            <strong>Personality:</strong> {character.personality}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            <strong>Voice:</strong> {character.voice_type}
-                          </Typography>
-                          <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                            <strong>Relationship:</strong> {character.relationship_type}
-                          </Typography>
-                          {character.user_query_instructions && (
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
-                                fontSize: '0.8rem',
-                                mt: 0.5,
-                                p: 1,
-                                bgcolor: 'grey.50',
-                                borderRadius: 1,
-                                border: '1px solid',
-                                borderColor: 'grey.200'
-                              }}
-                            >
-                              <strong>Instructions:</strong> 
-                              <br />
-                              {character.user_query_instructions.length > 100 
-                                ? `${character.user_query_instructions.substring(0, 100)}...`
-                                : character.user_query_instructions
-                              }
-                            </Typography>
-                          )}
-                        </Box>
-                      </Box>
+                      )}
+                      {features && (
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                          <strong>Features:</strong> {features}
+                        </Typography>
+                      )}
+                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <strong>Special Features:</strong> {specialFeatures || '—'}
+                      </Typography>
+                      {personality && (
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                          <strong>Personality:</strong> {personality}
+                        </Typography>
+                      )}
+                      {voice && (
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                          <strong>Voice:</strong> {voice}
+                        </Typography>
+                      )}
+                      {relationship && (
+                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                          <strong>Relationship:</strong> {relationship}
+                        </Typography>
+                      )}
                     </Box>
                   </TableCell>
                   <TableCell>
@@ -689,7 +626,57 @@ export const Characters: React.FC = () => {
                     </IconButton>
                   </TableCell>
                 </TableRow>
-              ))}
+
+                {/* Bio box in right-hand zone (A&P + Created + Updated) */}
+                {bio && bio.length > 0 && (
+                  <TableRow>
+                    {/* spacer for first two columns */}
+                    <TableCell colSpan={2} sx={{ borderBottom: 'none', p: 0 }} />
+                    {/* bio spans A&P + Created By + Updated Date */}
+                    <TableCell colSpan={3} sx={{ borderBottom: 'none', pl: 1, pr: 2, py: 1 }}>
+                      <Box
+                        sx={{
+                          borderRadius: 2,
+                          border: '1px solid',
+                          borderColor: 'grey.200',
+                          backgroundColor: 'grey.50',
+                          p: 1.25,
+                          // critical: ensure the content wraps in fixed table layout
+                          wordBreak: 'break-word',
+                          overflowWrap: 'anywhere',
+                          whiteSpace: 'pre-wrap',
+                        }}
+                      >
+                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
+                          Bio
+                        </Typography>
+                        <Typography variant="body2" sx={{ color: 'grey.700', fontSize: '0.9rem' }}>
+                          {bio.length > 300 ? (
+                            <>
+                              {expandedBios.has(character.id) ? bio : `${bio.slice(0, 300)}...`}
+                              <Button
+                                size="small"
+                                onClick={() => {
+                                  const next = new Set(expandedBios);
+                                  next.has(character.id) ? next.delete(character.id) : next.add(character.id);
+                                  setExpandedBios(next);
+                                }}
+                                sx={{ ml: 1, textTransform: 'none', p: 0, minWidth: 0 }}
+                              >
+                                {expandedBios.has(character.id) ? 'Show less' : 'Show more'}
+                              </Button>
+                            </>
+                          ) : bio}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    {/* preserve Actions column */}
+                    <TableCell sx={{ borderBottom: 'none', p: 0 }} />
+                  </TableRow>
+                )}
+                </React.Fragment>
+              );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -759,6 +746,6 @@ export const Characters: React.FC = () => {
         onSuccess={handleEditSuccess}
         editCharacter={editCharacter}
       />
-    </Container>
+  </Box>
   );
 };

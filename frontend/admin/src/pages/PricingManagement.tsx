@@ -44,6 +44,7 @@ interface PricingPlan {
   plan_name: string;
   pricing_id: string;
   currency?: string;
+  discount?: number;
   price: number;
   billing_cycle: string;
   coin_reward: number;
@@ -51,7 +52,7 @@ interface PricingPlan {
   updated_at: string;
 }
 
-export const PricingManagement: React.FC = () => {
+const PricingManagement: React.FC = () => {
   const [pricingPlans, setPricingPlans] = useState<PricingPlan[]>([]);
   const [filteredPlans, setFilteredPlans] = useState<PricingPlan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +71,8 @@ export const PricingManagement: React.FC = () => {
     pricing_id: '',
     price: 0,
     coin_reward: 0,
-    status: ''
+  status: '',
+  discount: 0
   });
   const [successMessage, setSuccessMessage] = useState('');
 
@@ -119,7 +121,8 @@ export const PricingManagement: React.FC = () => {
         pricing_id: selectedPlan.pricing_id,
         price: selectedPlan.price,
         coin_reward: selectedPlan.coin_reward,
-        status: selectedPlan.status
+  status: selectedPlan.status,
+  discount: selectedPlan.discount ?? 0
       });
       setEditModalOpen(true);
       setAnchorEl(null); // Just close the menu, keep selectedPlan
@@ -158,7 +161,7 @@ export const PricingManagement: React.FC = () => {
 
   const handleEditCancel = () => {
     setEditModalOpen(false);
-    setEditForm({ pricing_id: '', price: 0, coin_reward: 0, status: '' });
+  setEditForm({ pricing_id: '', price: 0, coin_reward: 0, status: '', discount: 0 });
     setSelectedPlan(null); // Clear selected plan when modal closes
   };
 
@@ -267,12 +270,28 @@ export const PricingManagement: React.FC = () => {
         />
         <Button
           variant="contained"
-          startIcon={<AddIcon />}
+          startIcon={<AddIcon sx={{ fontSize: 18 }} />}
           onClick={() => setCreateFormOpen(true)}
-          sx={{ 
-            bgcolor: '#6366f1',
-            '&:hover': { bgcolor: '#5048e5' },
-            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -1px rgb(0 0 0 / 0.06)'
+          aria-label="Create new plan"
+          disableElevation
+          sx={{
+            textTransform: 'none',
+            fontWeight: 500,
+            fontSize: 13.5,
+            borderRadius: 9999,
+            px: 2,
+            py: 1,
+            height: 36,
+            minHeight: 36,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 1,
+            backgroundImage: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%)',
+            color: '#fff',
+            '&:hover': {
+              filter: 'brightness(0.95)',
+              backgroundImage: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%)'
+            }
           }}
         >
           Add Plan
@@ -294,7 +313,9 @@ export const PricingManagement: React.FC = () => {
             <TableHead>
               <TableRow sx={{ bgcolor: 'grey.50' }}>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Plan Name</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Currency</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Pricing ID</TableCell>
+                  <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Discount</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Price</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Coin Reward</TableCell>
                 <TableCell sx={{ fontWeight: 600, color: 'grey.700' }}>Billing Cycle</TableCell>
@@ -324,6 +345,11 @@ export const PricingManagement: React.FC = () => {
                       {plan.plan_name}
                     </Typography>
                   </TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ color: 'grey.700', fontWeight: 600 }}>
+                        {plan.currency || 'USD'}
+                      </Typography>
+                    </TableCell>
                   <TableCell>
                     <Typography 
                       variant="body2" 
@@ -340,6 +366,11 @@ export const PricingManagement: React.FC = () => {
                       }}
                     >
                       {plan.pricing_id}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2" sx={{ color: 'grey.700', fontWeight: 600 }}>
+                      {typeof plan.discount === 'number' ? `${plan.discount}%` : '—'}
                     </Typography>
                   </TableCell>
                   <TableCell>
@@ -504,6 +535,21 @@ export const PricingManagement: React.FC = () => {
 
             <Box>
               <Typography variant="subtitle2" sx={{ color: 'grey.900', mb: 1 }}>
+                Discount (%)
+              </Typography>
+              <TextField
+                type="number"
+                value={(editForm as any).discount ?? 0}
+                onChange={(e) => handleEditFormChange('discount', parseFloat(e.target.value) || 0)}
+                fullWidth
+                size="small"
+                placeholder="0"
+                inputProps={{ min: 0, max: 100, step: 1 }}
+              />
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" sx={{ color: 'grey.900', mb: 1 }}>
                 Coin Reward *
               </Typography>
               <TextField
@@ -603,3 +649,5 @@ export const PricingManagement: React.FC = () => {
     </Container>
   );
 };
+
+export default PricingManagement;

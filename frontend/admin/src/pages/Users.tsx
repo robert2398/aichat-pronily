@@ -420,22 +420,33 @@ export const Users: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box data-admin-root className="admin-page-root user-page" sx={{ p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
       {/* Page Title */}
       <Typography variant="h4" sx={{ mb: 2, fontWeight: 600 }}>
         Users
       </Typography>
 
       {/* Filters, Search, and New User Button */}
-      <Paper sx={{ p: 2, mb: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 }}>
+  <Paper className="admin-paper filters-bar" sx={{ p: 2, mb: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Stack direction="row" spacing={2} alignItems="center" sx={{ flexWrap: 'wrap' }}>
           {/* Role Filter */}
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Role</InputLabel>
+            <InputLabel id="role-filter-label" shrink>Role</InputLabel>
             <Select
+              labelId="role-filter-label"
               value={roleFilter}
               label="Role"
               onChange={(e) => setRoleFilter(e.target.value)}
+              sx={{
+                '& .MuiSelect-select': {
+                  fontSize: 14,
+                  lineHeight: '20px',
+                  height: 36,
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '6px 12px'
+                }
+              }}
             >
               <MenuItem value="All">All</MenuItem>
               <MenuItem value="admin">Admin</MenuItem>
@@ -445,11 +456,22 @@ export const Users: React.FC = () => {
 
           {/* Status Filter */}
           <FormControl size="small" sx={{ minWidth: 120 }}>
-            <InputLabel>Status</InputLabel>
+            <InputLabel id="status-filter-label" shrink>Status</InputLabel>
             <Select
+              labelId="status-filter-label"
               value={statusFilter}
               label="Status"
               onChange={(e) => setStatusFilter(e.target.value)}
+              sx={{
+                '& .MuiSelect-select': {
+                  fontSize: 14,
+                  lineHeight: '20px',
+                  height: 36,
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '6px 12px'
+                }
+              }}
             >
               <MenuItem value="All">All</MenuItem>
               <MenuItem value="Active">Active</MenuItem>
@@ -465,7 +487,11 @@ export const Users: React.FC = () => {
               size="small"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              sx={{ width: 150 }}
+              sx={{
+                width: 150,
+                '& .MuiOutlinedInput-root': { height: 36 },
+                '& .MuiOutlinedInput-input': { fontSize: 14, padding: '6px 12px' }
+              }}
             />
             <Typography variant="body2">—</Typography>
             <TextField
@@ -473,12 +499,16 @@ export const Users: React.FC = () => {
               size="small"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
-              sx={{ width: 150 }}
+              sx={{
+                width: 150,
+                '& .MuiOutlinedInput-root': { height: 36 },
+                '& .MuiOutlinedInput-input': { fontSize: 14, padding: '6px 12px' }
+              }}
             />
           </Stack>
         </Stack>
 
-        <Stack direction="row" spacing={2} alignItems="center">
+  <Stack direction="row" spacing={2} alignItems="center" sx={{ ml: 'auto' }}>
           {/* Search */}
           <TextField
             size="small"
@@ -492,21 +522,39 @@ export const Users: React.FC = () => {
                 </InputAdornment>
               ),
             }}
-            sx={{ minWidth: 280 }}
+            sx={{
+              minWidth: 280,
+              '& .MuiOutlinedInput-root': { height: 36 },
+              '& .MuiOutlinedInput-input': { fontSize: 14, padding: '6px 12px' }
+            }}
           />
 
           {/* New User Button */}
           <Button
             variant="contained"
-            startIcon={<Add />}
-            sx={{
-              backgroundColor: '#ffc54d',
-              color: 'black',
-              '&:hover': {
-                backgroundColor: '#ffb929',
-              },
-            }}
+            startIcon={<Add sx={{ fontSize: 18 }} />}
             onClick={handleOpenAddUser}
+            aria-label="Create new user"
+            disableElevation
+            sx={{
+              textTransform: 'none',
+              fontWeight: 500,
+              fontSize: 13.5,
+              borderRadius: 9999,
+              px: 2,
+              py: 1,
+              height: 36,
+              minHeight: 36,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 1,
+              backgroundImage: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%)',
+              color: '#fff',
+              '&:hover': {
+                filter: 'brightness(0.95)',
+                backgroundImage: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%)'
+              }
+            }}
           >
             New User
           </Button>
@@ -515,6 +563,7 @@ export const Users: React.FC = () => {
       {/* Users Table with Material-UI */}
       <TableContainer 
         component={Paper} 
+        className="admin-table-container"
         sx={{ 
           flexGrow: 1, 
           display: 'flex', 
@@ -523,7 +572,7 @@ export const Users: React.FC = () => {
           minWidth: 800 // Ensure minimum width for proper menu positioning
         }}
       >
-        <Table stickyHeader>
+  <Table stickyHeader className="admin-table">
           <TableHead>
             <TableRow>
               <TableCell sx={{ fontWeight: 600, width: '60px' }}>ID</TableCell>
