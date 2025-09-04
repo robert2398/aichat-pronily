@@ -31,10 +31,11 @@ from passlib.context import CryptContext
 import uuid
 from fastapi.responses import JSONResponse
 from secrets import token_urlsafe
+import secrets
+import string
 from passlib.hash import bcrypt
 import datetime
-###login
-import datetime as dt
+
 from app.core.security import (
     verify_password,
     create_access_token,
@@ -50,7 +51,6 @@ from app.core.templates         import templates
 from app.services.email import send_email
 
 COOKIE_NAME = "refresh_token"
-RESET_EXP_MINUTES = 30
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 router = APIRouter()
@@ -58,18 +58,23 @@ router = APIRouter()
 @router.post("/password-reset/request")
 async def forgot_password(
     payload: ForgotPasswordRequest,
-    request: Request,
     db: AsyncSession = Depends(get_db),
 ):
     stmt = select(User).where(User.email == payload.email.lower())
     user: User | None = (await db.execute(stmt)).scalar_one_or_none()
     if not user:
         # don't reveal existence
-        return {"message": "If the e-mail exists, a reset link was sent."}
+        return {"message": "If the e-mail exists, password was sent to email."}
+    link_ttl_hours = int(await get_config_value_from_cache("SIGNUP_EMAIL_EXPIRY"))
+    backend_url = await get_config_value_from_cache("BACKEND_URL")
+    api_endpoint = await get_config_value_from_cache("API_ENDPOINT_VERSION")
+    company_address = await get_config_value_from_cache("ADDRESS")
+    support_email = await get_config_value_from_cache("SUPPORT_EMAIL")
+    app_name = await get_config_value_from_cache("APP_NAME")
+    expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=link_ttl_hours)
 
+    # create a reset audit row (optional) and also generate a one-time password
     raw_token, hashed = create_reset_code()
-    expires_at = datetime.now(dt.timezone.utc) + dt.timedelta(minutes=RESET_EXP_MINUTES)
-
     reset = PasswordReset(
         user_id=user.id,
         code_hash=hashed,
@@ -78,23 +83,43 @@ async def forgot_password(
     db.add(reset)
     await db.commit()
 
+    # generate a strong random password (alphanumeric + symbols)
+    def _generate_strong_password(length: int = 10) -> str:
+        alphabet = string.ascii_letters + string.digits + "!@#$%^&*()-_=+"
+        while True:
+            pwd = ''.join(secrets.choice(alphabet) for _ in range(length))
+            if (
+                any(c.islower() for c in pwd)
+                and any(c.isupper() for c in pwd)
+                and any(c.isdigit() for c in pwd)
+                and any(c in "!@#$%^&*()-_=+" for c in pwd)
+            ):
+                return pwd
+
+    new_password = _generate_strong_password(10)
+
+    # update user's password in DB before sending the email
+    user.hashed_password = hash_password(new_password)
+    await db.commit()
+
     reset_url = (
-        f"{settings.BACKEND_URL}/api/{settings.API_ENDPOINT_VERSION}/auth/reset-password?"
+        f"{backend_url}/api/{api_endpoint}/auth/reset-password?"
         f"uid={reset.id}&token={raw_token}"
     )
     html = templates.get_template("reset_password.html").render(
-        full_name=user.full_name or "",
-        reset_link=reset_url,
-        year=datetime.now(dt.timezone.utc).year,
+        full_name=user.full_name or "Explorer",
+        support_email=support_email,
+        app_name=app_name,
+        company_address=company_address,
+        password=new_password,
+        year=datetime.datetime.now(datetime.timezone.utc).year,
     )
-    # await send_email(
-    #     subject="Reset your AI Friend Chat password",
-    #     to=[user.email],
-    #     html=html,
-    # )
-    #return {"message": "If the e-mail exists, a reset link was sent."}
-    return JSONResponse(content={"message": "reset link was sent",
-                                     "emailcontent" : html}, status_code=202)
+    await send_email(
+        subject="AI Friend Chat password",
+        to=[user.email],
+        html=html,
+    )
+    return {"message": "If the e-mail exists, password was sent to email."}
 
 # ──────────────────────────────────────────────────────────────────────────
 @router.post("/password-reset/confirm")
@@ -107,7 +132,7 @@ async def reset_password(
         PasswordReset.id == payload.uid, #uuid.UUID(payload.token.split(".")[0] or "0"*32),  # safety
         User.email == payload.email.lower(),
         PasswordReset.consumed_at.is_(None),
-        PasswordReset.expires_at > datetime.now(dt.timezone.utc),
+        PasswordReset.expires_at > datetime.datetime.now(datetime.timezone.utc),
     )
     row = (await db.execute(stmt)).one_or_none()
     if not row:
@@ -123,14 +148,13 @@ async def reset_password(
 
     # 3. Update user password
     user.hashed_password = hash_password(payload.new_password)
-    pr.consumed_at = datetime.now(dt.timezone.utc)
+    pr.consumed_at = datetime.datetime.now(datetime.timezone.utc)
 
     # 4. Invalidate all refresh tokens
     await db.execute(
         update(User).where(User.id == user.id).values(hashed_password=user.hashed_password)
     )
     await db.commit()
-    #return {"message": "Password updated. Please log in."}
     return JSONResponse(content={"message": "Password updated. Please log in"},
                          status_code=200)
 
@@ -165,9 +189,10 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
         raw_token = token_urlsafe(32)          # send THIS to the user
         tok_hash  = bcrypt.hash(raw_token)     # store only the hash
         signup_expiry_hours = int(await get_config_value_from_cache("SIGNUP_EMAIL_EXPIRY"))
-
         company_address = await get_config_value_from_cache("ADDRESS")
         support_email = await get_config_value_from_cache("SUPPORT_EMAIL")
+        app_name = await get_config_value_from_cache("APP_NAME")
+
         expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=signup_expiry_hours)
         print("[DEBUG] Creating EmailVerification object")
         email_ver = EmailVerification(
@@ -189,7 +214,7 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
         )
         print("[DEBUG] Rendering email template")
         html = templates.get_template("verify_email.html").render(
-            app_name="Pornily AI",
+            app_name=app_name,
             link_ttl_hours = signup_expiry_hours,
             support_email = support_email,
             company_address = company_address,
@@ -442,6 +467,10 @@ async def change_password(
     # Verify old password
     if not verify_password(req.old_password, user.hashed_password):
         raise HTTPException(status_code=403, detail="Old password is incorrect")
+
+    # Ensure the new password is different from the old password
+    if req.old_password == req.new_password:
+        raise HTTPException(status_code=400, detail="New password must be different from the old password")
 
     # Update password
     user.hashed_password = hash_password(req.new_password)

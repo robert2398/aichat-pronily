@@ -283,8 +283,17 @@ export default function Gallery() {
         const res = await fetch(url, { headers });
         console.log('Gallery: fetch completed, status=', res.status);
         if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(txt || res.statusText || `HTTP ${res.status}`);
+          // try to parse known JSON error shapes and treat "no images found" as empty
+          let parsed = null;
+          try { parsed = await res.json(); } catch (e) { parsed = null; }
+          if (parsed && parsed.detail && /no images found/i.test(String(parsed.detail))) {
+            // server explicitly reports no images — treat as empty gallery
+            setItems([]);
+            setLoading(false);
+            return;
+          }
+          const txt = await res.text().catch(() => null);
+          throw new Error((parsed && JSON.stringify(parsed)) || txt || res.statusText || `HTTP ${res.status}`);
         }
         const data = await res.json();
         console.log('Gallery: response json', data);
@@ -315,8 +324,8 @@ export default function Gallery() {
         setLoading(false);
       }
     };
-    // initial load (use cache if available)
-    fetchGallery();
+  // initial load: force a network fetch so gallery is populated when the page opens
+  fetchGallery(true);
     const onReload = () => { console.log('Gallery: gallery:reload received — refetching'); fetchGallery(true); };
     window.addEventListener('gallery:reload', onReload);
     return () => {
@@ -354,7 +363,13 @@ export default function Gallery() {
       ) : error ? (
         <div className="text-center text-red-400">{error}</div>
       ) : items.length === 0 ? (
-        <div className="text-center text-white/60">No media yet.</div>
+        <div className="text-center text-white/70 space-y-3">
+          <div className="text-lg font-medium">You have not created any Images or Videos.</div>
+          <div className="text-sm text-white/60">Use the AI Porn Generator to create your own character images and videos.</div>
+          <div className="mt-3">
+            <button onClick={() => navigate('/ai-porn/image')} className="rounded-xl px-4 py-2 font-semibold text-white bg-gradient-to-r from-pink-500 via-pink-400 to-indigo-500">Use AI Porn Generator</button>
+          </div>
+        </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {items.map((it) => {

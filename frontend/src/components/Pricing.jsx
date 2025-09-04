@@ -73,7 +73,7 @@ function PlanCard({
 }) {
   return (
     <div
-      className={`relative rounded-3xl border bg-white/[.03] p-5 sm:p-6 shadow-md ${
+      className={`relative rounded-3xl border bg-[#0e0a16]/80 p-5 sm:p-6 shadow-md ${
         highlight
           ? "border-pink-500/40 ring-1 ring-pink-500/20"
           : "border-white/10"
@@ -85,31 +85,29 @@ function PlanCard({
         </span>
       )}
 
-      <div className="rounded-2xl bg-[#0e0a16]/80 p-5 ring-1 ring-white/10">
-        <h3 className="text-xl font-semibold mb-4">{title}</h3>
-        <PricePill price={priceCurrent} oldPrice={priceOld} suffix={per} />
-        {blurb && (
-          <p className="mt-2 text-sm text-white/70">
-            {blurb}
-          </p>
-        )}
+      <h3 className="text-xl font-semibold mb-4">{title}</h3>
+      <PricePill price={priceCurrent} oldPrice={priceOld} suffix={per} />
+      {blurb && (
+        <p className="mt-2 text-sm text-white/70">
+          {blurb}
+        </p>
+      )}
 
-        <ul className="mt-4 space-y-3">
-          {features.map((f, i) => (
-            <Feature key={i} ok={f.ok}>
-              {f.text}
-            </Feature>
-          ))}
-        </ul>
+      <ul className="mt-4 space-y-3">
+        {features.map((f, i) => (
+          <Feature key={i} ok={f.ok}>
+            {f.text}
+          </Feature>
+        ))}
+      </ul>
 
-        <button
-          onClick={onPay}
-          type="button"
-          className="mt-5 w-full rounded-xl bg-gradient-to-r from-pink-600 via-pink-500 to-indigo-500 px-4 py-2.5 text-center font-semibold text-white hover:opacity-95"
-        >
-          Pay
-        </button>
-      </div>
+      <button
+        onClick={onPay}
+        type="button"
+        className="mt-5 w-full rounded-xl bg-gradient-to-r from-pink-600 via-pink-500 to-indigo-500 px-4 py-2.5 text-center font-semibold text-white hover:opacity-95"
+      >
+        Pay
+      </button>
     </div>
   );
 }
@@ -175,22 +173,17 @@ export default function Pricing() {
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-2">
-      <div className="flex items-center gap-3 mb-6">
-        <button
-          className="grid h-9 w-9 place-items-center rounded-full border border-white/10 hover:bg-white/5"
-          onClick={() => navigate(-1)}
-          aria-label="Back"
-        >
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <h1 className="text-3xl sm:text-4xl font-bold">Pricing &amp; Membership</h1>
-        <div className="ml-auto">
+      <div className="text-center mb-4">
+        <h1 className="text-2xl sm:text-3xl font-semibold">Pricing &amp; Membership</h1>
+        <div className="mt-3 flex items-center justify-center">
           <SegmentedBilling value={billing} onChange={setBilling} />
         </div>
       </div>
 
-      <section className="rounded-3xl border border-white/10 bg-white/[.03] p-5 sm:p-8 shadow-[0_0_0_1px_rgba(255,255,255,0.05)_inset]">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {/* large rounded hero panel that holds cards */}
+      <section className="mx-auto rounded-3xl border border-white/10 bg-white/[.02] p-6 sm:p-10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)]">
+        <div className="max-w-6xl mx-auto rounded-2xl bg-[#24182b]/80 p-6 sm:p-10">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {loading ? (
             <div className="col-span-3 text-center py-8">Loading plans…</div>
           ) : error ? (
@@ -210,7 +203,7 @@ export default function Pricing() {
 
               filtered.sort((a, b) => (Number(a.price || 0) - Number(b.price || 0)));
 
-              return filtered.map((p) => {
+              return filtered.map((p, idx) => {
                 const priceCurrent = (p.price || 0).toFixed(2);
                 const priceOld = p.discount ? (p.price / (1 - p.discount / 100)).toFixed(2) : null;
                 const per = isAnnualSelected ? "/yr" : "/mo";
@@ -219,11 +212,14 @@ export default function Pricing() {
                   { ok: true, text: `${p.plan_name} tier` },
                 ];
 
+                // center card highlighted visually similar to Figma
+                const highlight = idx === Math.floor(filtered.length / 2);
+
                 return (
                   <div key={p.pricing_id} className={`transition-transform`}>
                     <PlanCard
                       title={p.plan_name}
-                      highlight={false}
+                      highlight={highlight}
                       priceCurrent={priceCurrent}
                       priceOld={priceOld}
                       per={per}
@@ -236,8 +232,9 @@ export default function Pricing() {
               });
             })()
           )}
-    </div>
+          </div>
+        </div>
       </section>
-  </main>
+    </main>
   );
 }

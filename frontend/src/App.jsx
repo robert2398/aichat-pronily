@@ -350,7 +350,7 @@ export default function App() {
             }
           />
           <Route
-            path="/forgot"
+            path="/forgot-password"
             element={
               <AuthLayout>
                 <ForgotPassword />

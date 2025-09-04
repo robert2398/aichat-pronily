@@ -1,10 +1,14 @@
 import { useState, useEffect } from "react";
-import { ChevronDown, SlidersHorizontal } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import CharacterCard from "./CharacterCard";
 
 export default function Characters() {
-  const [style, setStyle] = useState("all");
+  // NOTE: defaulting to "realistic" so the new two-option pill switch has one active state by default.
+  // Assumption: user expects a 2-way toggle between realistic and anime (no "All Models" button).
+  const [style, setStyle] = useState("realistic");
   const [data, setData] = useState([]);
+  const [gender, setGender] = useState(""); // "male" | "female" | "trans" | "" (empty = any)
+  const [showGenderMenu, setShowGenderMenu] = useState(false);
   const [visibleCount, setVisibleCount] = useState(5);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -56,40 +60,66 @@ export default function Characters() {
     };
   }, []);
 
-  // reset visible count when style/filter changes
+  // reset visible count when style or gender filter changes
   useEffect(() => {
     setVisibleCount(5);
-  }, [style]);
+  }, [style, gender]);
 
-  const filtered = data.filter((c) => (style === "all" ? true : (c.style || "") === style));
+  const filtered = data.filter((c) => {
+    const matchesStyle = style === "all" ? true : (c.style || "") === style;
+    const matchesGender = !gender ? true : (c.gender || "") === gender;
+    return matchesStyle && matchesGender;
+  });
   const visible = filtered.slice(0, visibleCount);
 
   return (
     <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-16">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">Pronily Character</h2>
-        <div className="flex items-center gap-2">
-          <button type="button" className="relative rounded-xl px-3 py-1.5 text-sm/6 text-white/90 hover:bg-white/5" onClick={() => { console.log("Gender tab click"); }}>
-            <span className="inline-flex items-center gap-1.5">Gender <ChevronDown className="h-4 w-4 opacity-70" /></span>
-            <span aria-hidden className="absolute left-3 -bottom-0.5 h-[2px] w-10 rounded-full bg-pink-500" />
-          </button>
-          <button onClick={() => { console.log("Style change", "realistic"); setStyle("realistic"); }} className={`${style === "realistic" ? "bg-white/10" : "hover:bg-white/5"} rounded-xl px-3 py-1.5 text-sm/6 text-white/90`}>
-            Realistic
-          </button>
-          <button onClick={() => { console.log("Style change", "anime"); setStyle("anime"); }} className={`${style === "anime" ? "bg-white/10" : "hover:bg-white/5"} rounded-xl px-3 py-1.5 text-sm/6 text-white/90`}>
-            Anime
-          </button>
+        <div className="flex items-center gap-3">
+          {/* Gender dropdown */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setShowGenderMenu((s) => !s)}
+              className="relative rounded-xl px-3 py-1.5 text-sm/6 text-white/90 hover:bg-white/5 inline-flex items-center gap-1"
+            >
+              <span>{gender ? (gender.charAt(0).toUpperCase() + gender.slice(1)) : 'Gender'}</span>
+              <ChevronDown className="h-4 w-4 opacity-70" />
+            </button>
+            {showGenderMenu && (
+              <div className="absolute right-0 mt-2 w-40 rounded-xl bg-[#0b0710] text-white shadow-lg ring-1 ring-white/10 py-1 z-50">
+                <div className="px-1 py-1">
+                  <button onClick={() => { setGender(""); setShowGenderMenu(false); }} className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5">All</button>
+                  <button onClick={() => { setGender('male'); setShowGenderMenu(false); }} className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5">Male</button>
+                  <button onClick={() => { setGender('female'); setShowGenderMenu(false); }} className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5">Female</button>
+                  <button onClick={() => { setGender('trans'); setShowGenderMenu(false); }} className="block w-full text-left px-3 py-2 rounded-md hover:bg-white/5">Trans</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Pill-style switch for style (Realistic / Anime) */}
+          <div className="inline-flex items-center gap-2 rounded-full bg-white/[.03] p-1 border border-white/10">
+            <button
+              type="button"
+              onClick={() => setStyle('realistic')}
+              className={`h-9 px-4 min-w-[7rem] text-sm rounded-full text-center font-medium flex items-center justify-center transition-colors ${style === 'realistic' ? 'bg-pink-500 text-white shadow' : 'text-white/90 hover:bg-white/5'}`}
+            >
+              Realistic
+            </button>
+            <button
+              type="button"
+              onClick={() => setStyle('anime')}
+              className={`h-9 px-4 min-w-[7rem] text-sm rounded-full text-center font-medium flex items-center justify-center transition-colors ${style === 'anime' ? 'bg-pink-500 text-white shadow' : 'text-white/90 hover:bg-white/5'}`}
+            >
+              Anime
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-end gap-2">
-        <button className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-sm/6 text-white/90 ring-1 ring-inset ring-white/15 hover:bg-white/5" onClick={() => console.log("Filter click") }>
-          <SlidersHorizontal className="h-4 w-4" /> Filter
-        </button>
-        <button onClick={() => { console.log("Style change", "all"); setStyle("all"); }} className="rounded-xl px-3 py-1.5 text-sm/6 text-white/90 ring-1 ring-inset ring-white/15 hover:bg-white/5">
-          All Models
-        </button>
-      </div>
+  {/* removed old Filter and All Models buttons per requirement */}
 
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
         {loading ? (

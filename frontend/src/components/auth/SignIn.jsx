@@ -84,7 +84,7 @@ export default function SignIn(){
         <Field label="Password" placeholder="Enter password" value={pw} onChange={setPw} type={show? 'text':'password'} rightIcon={show ? <Eye className="h-5 w-5"/> : <EyeOff className="h-5 w-5"/>} onRightIconClick={()=>setShow(v=>!v)} />
         <div className="flex items-center justify-between text-sm text-white/80">
           <label className="inline-flex items-center gap-2 select-none"><input type="checkbox" className="h-4 w-4 rounded border-white/20 bg-transparent"/> Remember Me</label>
-          <button className="text-pink-400 hover:text-pink-300" onClick={()=>navigate('/forgot',{state:{background:location}})}>Forgot password?</button>
+          <button className="text-pink-400 hover:text-pink-300" onClick={()=>navigate('/forgot-password',{state:{background:location}})}>Forgot password?</button>
         </div>
 
         {error && <div className="text-sm text-red-400">{error}</div>}

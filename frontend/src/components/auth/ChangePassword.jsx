@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Eye, EyeOff } from 'lucide-react';
+import Modal from '../ui/Modal';
 
 export default function ChangePassword() {
   const navigate = useNavigate();
@@ -13,6 +14,7 @@ export default function ChangePassword() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [modal, setModal] = useState({ open: false, title: '', message: '' });
 
   async function handleSave() {
     setError('');
@@ -44,11 +46,12 @@ export default function ChangePassword() {
       const data = await res.json().catch(() => null);
       if (!res.ok) {
         const msg = data && (data.detail || data.message || data.error) ? (data.detail || data.message || data.error) : res.statusText || 'Change password failed';
-        setError(typeof msg === 'string' ? msg : JSON.stringify(msg));
+        const message = typeof msg === 'string' ? msg : JSON.stringify(msg);
+        setModal({ open: true, title: 'Change password', message });
         return;
       }
 
-      setSuccess('Password changed successfully');
+      setModal({ open: true, title: 'Success', message: 'Password changed successfully' });
       // Optionally navigate back after a short delay
       setTimeout(() => navigate(-1), 900);
     } catch (err) {
@@ -144,8 +147,6 @@ export default function ChangePassword() {
           </div>
 
           <div className="pt-6">
-            {error && <div className="mb-3 text-sm text-red-400">{error}</div>}
-            {success && <div className="mb-3 text-sm text-green-400">{success}</div>}
             <button
               onClick={handleSave}
               disabled={loading}
@@ -156,6 +157,9 @@ export default function ChangePassword() {
           </div>
         </div>
       </div>
+      <Modal open={modal.open} title={modal.title} onClose={() => setModal({ open: false, title: '', message: '' })}>
+        {modal.message}
+      </Modal>
     </main>
   );
 }
