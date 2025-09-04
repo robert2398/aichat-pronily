@@ -109,7 +109,7 @@ class CoinTransaction(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     subscription_id = Column(Integer, ForeignKey("subscriptions.id"), nullable=True)
     coins = Column(Integer, nullable=False)  # positive for earn, negative for spend
-    source_type = Column(String(50), nullable=False)  # e.g. 'subscription', 'one_time_purchase', 'image', 'video', 'character'
+    source_type = Column(String(50), nullable=False)  # e.g. 'subscription', 'purchase', 'image', 'video', 'character'
     source_id = Column(Integer, nullable=True)
     description = Column(Text, nullable=True)
     period_start = Column(DateTime, nullable=True)

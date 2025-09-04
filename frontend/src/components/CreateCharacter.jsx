@@ -191,7 +191,16 @@ export default function CreateCharacter() {
   };
 
   const next = () => setStep((v) => (isStepValid(v) ? Math.min(9, v + 1) : v));
-  const back = () => setStep((v) => Math.max(1, v - 1));
+  // Back should step back within the wizard, but if we're on step 1
+  // navigate back to the previous route/page instead of staying on the same page.
+  const back = () => {
+    if (step > 1) {
+      setStep((v) => Math.max(1, v - 1));
+    } else {
+      // go back in history when the user is on the first step
+      navigate(-1);
+    }
+  };
 
   // finish now navigates to a dedicated save/confirmation page (separate route)
   const finish = () => {

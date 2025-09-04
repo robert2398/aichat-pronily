@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
 
     SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_USER: str = "robert2398@gmail.com"
     SMTP_PORT: int = 587
     SMTP_PASSWORD: str = ""
 

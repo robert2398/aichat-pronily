@@ -272,10 +272,10 @@ export default function Header() {
                   Sign in
                 </a>
                 <a
-                  href="#get-started"
+                  href="/signup"
                   className="rounded-xl px-3 py-2 text-sm font-medium text-[#0A011A] bg-gradient-to-r from-violet-300 via-fuchsia-200 to-sky-200 shadow-[0_0_0_1px_rgba(255,255,255,0.15)_inset] hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
                   onClick={() => {
-                    console.log("Get started click (desktop)");
+                    navigate('/signup', { state: { background: location } });
                   }}
                 >
                   Get started
@@ -440,9 +440,9 @@ export default function Header() {
                       Sign in
                   </a>
                   <a
-                    href="#get-started"
+                    href="/signup"
                     className="flex-1 rounded-xl px-3 py-2 text-center text-sm font-medium text-[#0A011A] bg-gradient-to-r from-violet-300 via-fuchsia-200 to-sky-200 hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                    onClick={() => { setOpen(false); }}
+                    onClick={() => { setOpen(false); navigate('/signup', { state: { background: location } }); }}
                   >
                     Get started
                   </a>

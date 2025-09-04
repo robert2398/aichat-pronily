@@ -103,6 +103,7 @@ export interface APICharacter {
   breast_size: string | null;
   butt_size: string | null;
   dick_size: string | null;
+  bio?: string;
   personality: string;
   voice_type: string;
   relationship_type: string;
@@ -129,6 +130,7 @@ export interface Character {
   breast_size: string | null;
   butt_size: string | null;
   dick_size: string | null;
+  bio?: string;
   personality: string;
   voice_type: string;
   relationship_type: string;
@@ -336,6 +338,8 @@ class APIService {
       breast_size: apiCharacter.breast_size,
       butt_size: apiCharacter.butt_size,
       dick_size: apiCharacter.dick_size,
+  // map bio if present (APIs may vary between 'bio' or 'description')
+  bio: (apiCharacter as any).bio ?? (apiCharacter as any).description ?? '',
       personality: apiCharacter.personality,
       voice_type: apiCharacter.voice_type,
       relationship_type: apiCharacter.relationship_type,

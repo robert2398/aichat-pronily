@@ -54,7 +54,7 @@ class UserProfile(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     full_name = Column(Text, nullable=True)
     email_id = Column(Text, nullable=True)
-    username = Column(String(150), nullable=True, unique=True)
+    username = Column(String(150), nullable=True, unique=False)
     gender = Column(String(32), nullable=True)
     birth_date = Column(Date, nullable=True)
     profile_image_url = Column(Text, nullable=True)

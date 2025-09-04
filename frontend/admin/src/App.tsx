@@ -5,7 +5,7 @@ import DashboardPage from './pages/Dashboard';
 import { Users } from './pages/Users';
 import { AIModelControl } from './pages/AIModelControl';
 import { ContentModeration } from './pages/ContentModeration';
-import { Subscriptions } from './pages/Subscriptions';
+// Subscriptions removed
 import { PricingManagement } from './pages/PricingManagement';
 import { Analytics } from './pages/Analytics';
 import { Characters } from './pages/Characters';
@@ -17,17 +17,15 @@ import { PushNotification } from './pages/PushNotification';
 import { APIsManagement } from './pages/APIsManagement';
 import { CodeInjections } from './pages/CodeInjections';
 import { AdminAccess } from './pages/AdminAccess';
-import { PlanReview } from './pages/PlanReview';
+// PlanReview removed
 import { SetPassword } from './pages/SetPassword';
 import { ActivationFailed } from './pages/ActivationFailed';
-import Success from './pages/Success';
-import Cancel from './pages/Cancel';
+// Success/Cancel removed
 
 const routes = [
   { path: '/dashboard', element: <DashboardPage /> },
   { path: '/users', element: <Users /> },
-  { path: '/subscriptions', element: <Subscriptions /> },
-  { path: '/plan-review', element: <PlanReview /> },
+  // payment routes removed
   { path: '/pricing', element: <PricingManagement /> },
   { path: '/promo', element: <PromoManagement /> },
   { path: '/content-moderation', element: <ContentModeration /> },
@@ -54,8 +52,7 @@ const App: React.FC = () => {
   return (
     <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="/success" element={<Success />} />
-        <Route path="/cancel" element={<Cancel />} />
+  {/* payment callback routes removed */}
         <Route path="/users/set-password" element={<SetPassword />} />
         <Route path="/activation-failed" element={<ActivationFailed />} />
         <Route element={<AppLayout />}>

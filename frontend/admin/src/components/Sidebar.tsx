@@ -21,7 +21,6 @@ import {
   Notifications as NotificationsIcon,
   Code as CodeIcon,
   LocalOffer as TagIcon,
-  AttachMoney as MoneyIcon,
   Bolt as BoltIcon,
   PriceChange as PricingIcon
 } from '@mui/icons-material';
@@ -34,7 +33,6 @@ interface SidebarProps {
 const navItems = [
   { label: 'Dashboard', id: 'dashboard', path: '/admin/dashboard', icon: HomeIcon },
   { label: 'User Management', id: 'users', path: '/admin/users', icon: PeopleIcon },
-  { label: 'Payment Gateway', id: 'subscriptions', path: '/admin/subscriptions', icon: MoneyIcon },
   { label: 'Pricing Management', id: 'pricing', path: '/admin/pricing', icon: PricingIcon },
   { label: 'Promo Management', id: 'promo', path: '/admin/promo', icon: TagIcon },
   { label: 'Content Moderation', id: 'content-moderation', path: '/admin/content-moderation', icon: SecurityIcon },
@@ -70,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   const drawerContent = (
-    <Box sx={{ width: 288, pt: 1 }}> {/* 288px = w-72 equivalent */}
+    <Box sx={{ width: 288, pt: 1 }}> {/* 288px = reduced sidebar width */}
       <List sx={{ px: 1.25 }}>
         {navItems.map((item) => {
           const Icon = item.icon;
@@ -130,6 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       onClose={onClose}
       sx={{
         '& .MuiDrawer-paper': {
+          width: 288,
           top: 80, // Account for header height
           height: 'calc(100vh - 80px)',
           borderRight: 1,

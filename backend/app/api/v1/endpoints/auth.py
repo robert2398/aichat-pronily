@@ -32,7 +32,6 @@ import uuid
 from fastapi.responses import JSONResponse
 from secrets import token_urlsafe
 from passlib.hash import bcrypt
-#from datetime import datetime
 import datetime
 ###login
 import datetime as dt
@@ -51,7 +50,6 @@ from app.core.templates         import templates
 from app.services.email import send_email
 
 COOKIE_NAME = "refresh_token"
-COOKIE_MAX_AGE = 60 * 60 * 24 * 30
 RESET_EXP_MINUTES = 30
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -166,7 +164,11 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
         print("[DEBUG] Generating email verification token")
         raw_token = token_urlsafe(32)          # send THIS to the user
         tok_hash  = bcrypt.hash(raw_token)     # store only the hash
-        expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(minutes=15)
+        signup_expiry_hours = int(await get_config_value_from_cache("SIGNUP_EMAIL_EXPIRY"))
+
+        company_address = await get_config_value_from_cache("ADDRESS")
+        support_email = await get_config_value_from_cache("SUPPORT_EMAIL")
+        expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=signup_expiry_hours)
         print("[DEBUG] Creating EmailVerification object")
         email_ver = EmailVerification(
             user_id=user_id,
@@ -187,6 +189,10 @@ async def signup(user: UserCreate, db: AsyncSession = Depends(get_db)):
         )
         print("[DEBUG] Rendering email template")
         html = templates.get_template("verify_email.html").render(
+            app_name="Pornily AI",
+            link_ttl_hours = signup_expiry_hours,
+            support_email = support_email,
+            company_address = company_address,
             full_name=full_name,
             verify_link=verify_url,
             year=datetime.datetime.now(datetime.timezone.utc).year,
@@ -235,45 +241,45 @@ async def verify_email(uid: uuid.UUID, token: str, db: AsyncSession = Depends(ge
     await db.commit()
 
 
-    # --- AUTO-LOGIN LOGIC ---
-    # access_token = create_access_token(str(user.id))
-    # raw_refresh, hashed_refresh = create_refresh_token()
-
-    # expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
-    # await db.execute(
-    #     insert(RefreshToken).values(
-    #         user_id=user.id,
-    #         token_hash=hashed_refresh,
-    #         user_agent=None,
-    #         ip_address=None,
-    #         expires_at=expires_at,
-    #     )
-    # )
-    # await db.commit()
+    ### --- AUTO-LOGIN LOGIC ---
+    access_token = create_access_token(str(user.id))
+    raw_refresh, hashed_refresh = create_refresh_token()
+    login_expiry_in_days = int(await get_config_value_from_cache("LOGIN_EXPIRY"))
+    expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=login_expiry_in_days)
+    await db.execute(
+        insert(RefreshToken).values(
+            user_id=user.id,
+            token_hash=hashed_refresh,
+            user_agent=None,
+            ip_address=None,
+            expires_at=expires_at,
+        )
+    )
+    await db.commit()
     frontend_url = await get_config_value_from_cache("FRONTEND_URL")
-        
-    # response = RedirectResponse(url=f"{frontend_url}")
-    # response.set_cookie(
-    #     key="refresh_token",
-    #     value=raw_refresh,
-    #     max_age=60 * 60 * 24 * 30,
-    #     httponly=True,
-    #     secure=not settings.DEBUG,
-    #     samesite="strict",
-    #     path="/",
-    # )
-    # response.set_cookie(
-    #     key="access_token",
-    #     value=access_token,
-    #     httponly=False,
-    #     secure=not settings.DEBUG,
-    #     samesite="strict",
-    #     path="/",
-    # )
-    # return response
+    COOKIE_MAX_AGE = int(await get_config_value_from_cache("LOGIN_EXPIRY")) * 60 * 60 * 24
+    response = RedirectResponse(url=f"{frontend_url}")
+    response.set_cookie(
+        key="refresh_token",
+        value=raw_refresh,
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        secure=not settings.DEBUG,
+        samesite="strict",
+        path="/",
+    )
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=False,
+        secure=not settings.DEBUG,
+        samesite="strict",
+        path="/",
+    )
+    return response
 
-    return JSONResponse(content={"message": "Email Verified successfully",},
-                                     status_code=200)
+    # return JSONResponse(content={"message": "Email Verified successfully",},
+    #                                  status_code=200)
 
 
 @router.get("/activate-user")
@@ -379,7 +385,8 @@ async def login(
     )
 
     # 4. insert new refresh row
-    expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)
+    login_expiry_in_days = int(await get_config_value_from_cache("LOGIN_EXPIRY"))
+    expires_at = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=login_expiry_in_days)
     await db.execute(
         insert(RefreshToken).values(
             user_id=user.id,
@@ -390,6 +397,7 @@ async def login(
         )
     )
     await db.commit()
+    COOKIE_MAX_AGE = int(await get_config_value_from_cache("LOGIN_EXPIRY")) * 60 * 60 * 24
 
     # 5. send cookie (HttpOnly, Secure in prod)
     response.set_cookie(

@@ -20,7 +20,6 @@ router = APIRouter()
 async def add_update_profile(
     full_name: Optional[str] = Form(None),
     email: Optional[str] = Form(None),
-    email_id: Optional[str] = Form(None),
     username: Optional[str] = Form(None),
     gender: Optional[str] = Form(None),
     birth_date: Optional[str] = Form(None),
@@ -36,14 +35,12 @@ async def add_update_profile(
     profile = (await db.execute(stmt)).scalar_one_or_none()
 
     # prefer email form field, then email_id, then fallback to user.email
-    new_email_value = email or email_id or None
+    new_email_value = email or None
 
     if profile:
         # update fields if provided
         if full_name is not None:
             profile.full_name = full_name
-        if new_email_value is not None:
-            profile.email_id = new_email_value
         if username is not None:
             profile.username = username
         if gender is not None:

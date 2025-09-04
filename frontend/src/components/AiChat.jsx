@@ -610,6 +610,18 @@ export default function AiChat() {
 
   const send = () => {
     if (!text.trim()) return;
+    // If user isn't logged in, redirect to signin and preserve return location
+    const storedToken = localStorage.getItem('pronily:auth:token');
+    if (!storedToken) {
+      // preserve current location so user can be returned after auth
+      try {
+        navigate('/signin', { state: { background: location, returnTo: location.pathname + (location.search || '') } });
+      } catch (e) {
+        navigate('/signin');
+      }
+      return;
+    }
+
     if (!selectedSafe.id) {
       // no character selected
       setMessages((m) => [...m, { id: Date.now(), from: "them", text: "Please select a character before sending a message.", time: "" }]);
@@ -926,6 +938,21 @@ export default function AiChat() {
               style={{ paddingBottom: 'var(--composer-h, 64px)' }}
             >
               {(() => {
+                // If user isn't logged in or there are no prior messages for this character,
+                // show a friendly default prompt instead of an empty chat.
+                const hasAuth = Boolean(localStorage.getItem('pronily:auth:token'));
+                if (!hasAuth || (Array.isArray(messages) && messages.length === 0)) {
+                  return (
+                    <div className="h-full w-full flex items-center justify-center">
+                      <div className="max-w-xl text-center text-white/70 px-4">
+                        <div className="text-sm">
+                          Hey you. I could ask for your details, or I could just say....you’re a vibe. Want to test compatibility? 😏
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
+
                 // Group messages by day key
                 const groups = [];
                 let lastKey = null;

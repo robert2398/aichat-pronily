@@ -3,10 +3,11 @@ from email.mime.text     import MIMEText
 import aiosmtplib
 from app.core.config import settings   # your pydantic Settings class
 from app.services.app_config import get_config_value_from_cache
+from app.core.config import settings
 async def send_email(*, subject: str, to: list[str], html: str, text: str | None = None) -> None:
-    email_from = await get_config_value_from_cache("SMTP_USER")
-    hostname = await get_config_value_from_cache("SMTP_HOST")
-    port = await get_config_value_from_cache("SMTP_PORT")
+    email_from = settings.SMTP_USER
+    hostname = settings.SMTP_HOST
+    port = settings.SMTP_PORT
     msg            = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"]    = email_from

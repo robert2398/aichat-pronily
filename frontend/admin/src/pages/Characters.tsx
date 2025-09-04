@@ -311,8 +311,8 @@ export const Characters: React.FC = () => {
       alignItems="center"
       sx={{ flexWrap: { xs: 'wrap', md: 'nowrap' } }}
     >
-      {/* Search – narrower (240px on md+) */}
-      <Box sx={{ width: { xs: '100%', md: 240 } }}>
+  {/* Search – narrower (200px on md+) */}
+  <Box sx={{ width: { xs: '100%', md: 220 } }}>
         <TextField
           placeholder="Search characters..."
           value={searchTerm}
@@ -337,12 +337,12 @@ export const Characters: React.FC = () => {
       </Box>
 
       {/* Filters label */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {/* <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
         <FilterListIcon sx={{ color: 'grey.600', fontSize: 20 }} />
         <Typography variant="body2" sx={{ color: 'grey.600', fontWeight: 500 }}>
           Filters:
         </Typography>
-      </Box>
+      </Box> */}
 
       {/* Created By */}
       <Box sx={{ width: { xs: '100%', sm: 200, md: 170 } }}>
@@ -417,7 +417,7 @@ export const Characters: React.FC = () => {
           disableElevation
           sx={{
             textTransform: 'none', fontWeight: 600, fontSize: 14, borderRadius: 9999,
-            px: 3.5, height: 40, minWidth: 180, color: '#fff',
+            px: 3.5, height: 40, minWidth: 200, color: '#fff',
             backgroundImage: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%)',
             '&:hover': { filter: 'brightness(0.95)', backgroundImage: 'linear-gradient(90deg, #ec4899 0%, #8b5cf6 60%, #38bdf8 100%)' },
           }}
@@ -440,15 +440,15 @@ export const Characters: React.FC = () => {
         }}
       >
         <TableContainer>
-          <Table size="small" sx={{ tableLayout: 'fixed' }}>
+          <Table size="small" sx={{ tableLayout: 'fixed', borderCollapse: 'collapse' }}>
             <TableHead>
               <TableRow sx={{ bgcolor: 'grey.50' }}>
-                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '22%' }}>Character</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '29%' }}>Character Details</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '27%' }}>Appearance & Personality</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '12%' }}>Created By</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '7%' }}>Updated Date</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '3%' }}>Actions</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '23%' }}>Character</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '16%' }}>Character Details</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '32%' }}>Appearance & Personality</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '10%' }}>Created By</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '12%' }}>Updated Date</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'grey.700', width: '7%' }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -473,7 +473,7 @@ export const Characters: React.FC = () => {
                     borderColor: 'grey.100',
                   }}
                 >
-                  <TableCell sx={{ width: '20%', py: 1.25, pr: 2 }}>
+                  <TableCell sx={{ width: '23%', py: 1.25, pr: 2 }}>
                     <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
                       {/* Avatar */}
                       <Avatar
@@ -508,93 +508,137 @@ export const Characters: React.FC = () => {
                       </Avatar>
 
                       {/* Character Info */}
-                      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        <Typography sx={{ fontWeight: 600, color: 'grey.900', fontSize: '1rem', lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                        <Typography sx={{ fontWeight: 600, color: 'grey.900', fontSize: '0.8rem', lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {character.name}
                         </Typography>
 
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                          <Typography variant="body2" sx={{ color: 'primary.main', fontSize: '0.8rem', fontWeight: 600 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                          <Typography variant="body2" sx={{ color: 'primary.main', fontSize: '0.75rem', fontWeight: 600 }}>
                             ID: {character.id}
                           </Typography>
-                          <Typography variant="body2" sx={{ color: 'secondary.main', fontSize: '0.8rem', fontWeight: 600 }}>
+                          <Typography variant="body2" sx={{ color: 'secondary.main', fontSize: '0.75rem', fontWeight: 600 }}>
                             User ID: {character.user_id}
                           </Typography>
                         </Box>
 
-                        <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.25 }}>
-                          <Typography variant="body2" sx={{ color: 'grey.700', fontSize: '0.8rem', fontWeight: 500 }}>
-                            {character.age}
+                        <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.2 }}>
+                          <Typography variant="body2" sx={{ color: 'grey.700', fontSize: '0.75rem', fontWeight: 500 }}>
+                            Age: {character.age}
                           </Typography>
-                          <Typography variant="body2" sx={{ color: 'grey.700', fontSize: '0.8rem' }}>
+                          <Typography variant="body2" sx={{ color: 'grey.700', fontSize: '0.75rem' }}>
                             {character.style}
                           </Typography>
+                          {relationship && (
+                            <Typography variant="body2" sx={{ color: 'grey.700', fontSize: '0.75rem' }}>
+                              {relationship}
+                            </Typography>
+                          )}
                         </Box>
                       </Box>
                     </Box>
                   </TableCell>
                   {/* Character Details (core identity) - header label removed to save space */}
-                  <TableCell sx={{ width: '29%', py: 1.25, pr: 0 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.15 }}>
-                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                  <TableCell sx={{ width: '16%', p: 1, textAlign: 'left' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.15, pl: 1, pr: 0.5, py: 1.25, pb: 1, alignItems: 'flex-start' }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                         <strong>Ethnicity:</strong> {character.ethnicity}
                       </Typography>
-                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                         <strong>Eyes:</strong> {character.eye_colour}
                       </Typography>
-                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                         <strong>Hair:</strong> {character.hair_colour} {character.hair_style}
                       </Typography>
-                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                         <strong>Body:</strong> {character.body_type}
                       </Typography>
                       {character.breast_size && (
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                           <strong>Breast:</strong> {character.breast_size}
                         </Typography>
                       )}
                       {character.butt_size && (
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                           <strong>Butt:</strong> {character.butt_size}
                         </Typography>
                       )}
                       {character.dick_size && (
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                           <strong>Dick:</strong> {character.dick_size}
                         </Typography>
                       )}
                     </Box>
                   </TableCell>
 
-                  {/* Appearance & Personality using normalized values */}
-                  <TableCell sx={{ width: '27%', py: 1, pl: 0, pr: 1 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.15 }}>
+                  {/* Appearance & Personality using normalized values (includes Bio) */}
+                  <TableCell sx={{ width: '32%', p: 1, textAlign: 'left' }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.15, pl: 0.5, pr: 0.5, pt: 0, pb: 1, alignItems: 'flex-start' }}>
                       {clothing && (
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                           <strong>Clothing:</strong> {clothing}
                         </Typography>
                       )}
                       {features && (
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                           <strong>Features:</strong> {features}
                         </Typography>
                       )}
-                      <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                      <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                         <strong>Special Features:</strong> {specialFeatures || '—'}
                       </Typography>
                       {personality && (
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                           <strong>Personality:</strong> {personality}
                         </Typography>
                       )}
                       {voice && (
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem' }}>
                           <strong>Voice:</strong> {voice}
                         </Typography>
                       )}
-                      {relationship && (
-                        <Typography variant="body2" sx={{ fontSize: '0.8rem' }}>
-                          <strong>Relationship:</strong> {relationship}
+                      {/* Relationship moved to Character column */}
+
+                      {/* Inline Bio inside A&P column (keeps existing truncation + toggle) */}
+                      {bio && (
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            color: 'inherit',
+                            fontSize: '0.75rem',
+                            mt: 0.5,
+                            width: '100%',
+                            wordBreak: 'break-word',
+                            overflowWrap: 'anywhere',
+                            whiteSpace: 'pre-wrap',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                          }}
+                        >
+                          <Box component="span" sx={{ fontWeight: 600 }}>
+                            Bio :
+                          </Box>
+                          <Box component="span" sx={{ display: 'inline' }}>
+                            {bio.length > 300 ? (
+                              <>
+                                {expandedBios.has(character.id) ? bio : `${bio.slice(0, 300)}...`}
+                                <Button
+                                  size="small"
+                                  onClick={() => {
+                                    const next = new Set(expandedBios);
+                                    next.has(character.id) ? next.delete(character.id) : next.add(character.id);
+                                    setExpandedBios(next);
+                                  }}
+                                  sx={{ ml: 1, textTransform: 'none', p: 0, minWidth: 0 }}
+                                >
+                                  {expandedBios.has(character.id) ? 'Show less' : 'Show more'}
+                                </Button>
+                              </>
+                            ) : (
+                              bio
+                            )}
+                          </Box>
                         </Typography>
                       )}
                     </Box>
@@ -627,53 +671,7 @@ export const Characters: React.FC = () => {
                   </TableCell>
                 </TableRow>
 
-                {/* Bio box in right-hand zone (A&P + Created + Updated) */}
-                {bio && bio.length > 0 && (
-                  <TableRow>
-                    {/* spacer for first two columns */}
-                    <TableCell colSpan={2} sx={{ borderBottom: 'none', p: 0 }} />
-                    {/* bio spans A&P + Created By + Updated Date */}
-                    <TableCell colSpan={3} sx={{ borderBottom: 'none', pl: 1, pr: 2, py: 1 }}>
-                      <Box
-                        sx={{
-                          borderRadius: 2,
-                          border: '1px solid',
-                          borderColor: 'grey.200',
-                          backgroundColor: 'grey.50',
-                          p: 1.25,
-                          // critical: ensure the content wraps in fixed table layout
-                          wordBreak: 'break-word',
-                          overflowWrap: 'anywhere',
-                          whiteSpace: 'pre-wrap',
-                        }}
-                      >
-                        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-                          Bio
-                        </Typography>
-                        <Typography variant="body2" sx={{ color: 'grey.700', fontSize: '0.9rem' }}>
-                          {bio.length > 300 ? (
-                            <>
-                              {expandedBios.has(character.id) ? bio : `${bio.slice(0, 300)}...`}
-                              <Button
-                                size="small"
-                                onClick={() => {
-                                  const next = new Set(expandedBios);
-                                  next.has(character.id) ? next.delete(character.id) : next.add(character.id);
-                                  setExpandedBios(next);
-                                }}
-                                sx={{ ml: 1, textTransform: 'none', p: 0, minWidth: 0 }}
-                              >
-                                {expandedBios.has(character.id) ? 'Show less' : 'Show more'}
-                              </Button>
-                            </>
-                          ) : bio}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    {/* preserve Actions column */}
-                    <TableCell sx={{ borderBottom: 'none', p: 0 }} />
-                  </TableRow>
-                )}
+                {/* bio now inlined into the Appearance & Personality column */}
                 </React.Fragment>
               );
               })}

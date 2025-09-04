@@ -1,60 +1,107 @@
-<!-- file: templates/verify_email.html  -->
 <!doctype html>
-<html lang="en" style="margin:0;padding:0;background:#f5f7fa">
+<html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <title>Confirm your e-mail</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="utf-8">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Confirm your email</title>
     <style>
-      /* Tailored for wide client support – avoid external CSS */
-      .btn {
-        display:inline-block;
-        padding:14px 28px;
-        background:#6366f1;
-        color:#ffffff !important;
-        border-radius:6px;
-        text-decoration:none;
-        font-weight:600;
-      }
-      .card {
-        max-width:520px;
-        margin:40px auto;
-        background:#ffffff;
-        border-radius:10px;
-        box-shadow:0 8px 24px rgba(0,0,0,.05);
-        padding:48px 40px;
-        font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
-        text-align:center;
-      }
-      .footer {
-        margin-top:40px;
-        font-size:12px;
-        color:#94a3b8;
+      .preheader{display:none!important;visibility:hidden;opacity:0;color:transparent;height:0;width:0;overflow:hidden;mso-hide:all}
+      @media (prefers-color-scheme: dark){
+        body,.bg{background:#0b0b0e !important}
+        .card{background:#16161a !important}
+        .text{color:#e8e8ea !important}
+        .muted{color:#9b9ba1 !important}
+        .btn{color:#ffffff !important}
       }
     </style>
   </head>
+  <body style="margin:0;padding:0;background:#f5f7fb;">
+    <div class="preheader">Finish setting up your account in 30 seconds.</div>
 
-  <body>
-    <div class="card">
-      <img src="https://your-cdn.com/logo.png" width="64" height="64" alt="AI Friend" style="margin-bottom:20px">
-      <h1 style="margin:0 0 12px;font-size:24px;color:#0f172a">Confirm your e-mail</h1>
-      <p style="margin:0 0 32px;color:#334155;line-height:1.4">
-        Hi&nbsp;{{ full_name|default('there') }},<br>
-        Thanks for joining <strong>AI&nbsp;Friend&nbsp;Chat</strong>!<br>
-        Click the button below to activate your account.
-      </p>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" class="bg" style="background:#f5f7fb;">
+      <tr>
+        <td align="center" style="padding:32px 16px;">
+          <table role="presentation" width="600" cellspacing="0" cellpadding="0" class="card" style="max-width:600px;width:100%;background:#ffffff;border-radius:14px;box-shadow:0 6px 20px rgba(31,41,55,.06);">
+            
+            <!-- Top title -->
+            <tr>
+              <td align="center" style="padding:28px 32px 4px;">
+                <div style="font:700 28px/1.3 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,Arial,sans-serif;color:#6B6BF6;">
+                  Pornily AI Character Chatbot
+                </div>
+              </td>
+            </tr>
 
-      <!-- Verification link -->
-      <a href="{{ verify_link }}" class="btn">Verify my e-mail</a>
+            <tr>
+              <td align="center" style="padding:8px 32px 8px;">
+                <div class="text" style="font:700 24px/1.25 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,'Helvetica Neue',Arial,sans-serif;color:#111827;">
+                  Confirm your email
+                </div>
+              </td>
+            </tr>
 
-      <p style="margin:32px 0 0;color:#64748b;font-size:14px;line-height:1.5">
-        If the button doesn’t work, copy &amp; paste this URL in your browser:<br>
-        <a href="{{ verify_link }}" style="color:#6366f1">{{ verify_link }}</a>
-      </p>
+            <tr>
+              <td class="text" style="padding:4px 32px 0;font:400 16px/1.6 Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#374151;">
+                <p style="margin:0 0 10px;">Hi {{ full_name|default('there') }},</p>
+                <p style="margin:0 0 10px;">
+                  Thanks for joining <strong>{{ app_name }}</strong>!
+                </p>
+                <p style="margin:0 0 18px;">
+                  I could start with a boring intro, or I could just say—you seem kinda cool. Ready to activate your account?
+                </p>
+              </td>
+            </tr>
 
-      <div class="footer">
-        Sent by AI Friend Chat • © {{ year }}
-      </div>
-    </div>
+            <!-- Larger gradient pill button -->
+            <tr>
+              <td align="center" style="padding:12px 32px 8px;">
+                <!--[if mso]>
+                <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word"
+                  href="{{ verify_link }}"
+                  style="height:56px;v-text-anchor:middle;width:300px;" arcsize="50%" stroke="f" fill="t">
+                  <v:fill type="gradient" angle="90" color="#ec4899" color2="#6366f1"/>
+                  <w:anchorlock/>
+                  <center style="color:#ffffff;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:700;">
+                    Verify my email
+                  </center>
+                </v:roundrect>
+                <![endif]-->
+                <!--[if !mso]><!-- -->
+                <a href="{{ verify_link }}" role="button"
+                   style="display:inline-block;background:#ec4899;background-image:linear-gradient(90deg,#ec4899,#f472b6,#6366f1);color:#fff;
+                          text-decoration:none;font:700 20px/56px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Inter,Arial,sans-serif;
+                          padding:0 8px;border-radius:9999px;min-width:300px;text-align:center;box-shadow:0 6px 12px rgba(31,41,55,.22);">
+                  Verify my email
+                </a>
+                <!--<![endif]-->
+              </td>
+            </tr>
+
+            <tr>
+              <td class="muted" style="padding:18px 32px 0;font:400 14px/1.6 Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif;color:#6b7280;">
+                <p style="margin:0 0 10px;">
+                  If the button doesn’t work, copy and paste this URL into your browser:
+                  <br>
+                  <a href="{{ verify_link }}" style="color:#6B6BF6;text-decoration:underline;word-break:break-all;">{{ verify_link }}</a>
+                </p>
+                <p style="margin:0 0 10px;">This link expires in {{ link_ttl_hours|default('24') }} hours.</p>
+                <p style="margin:0;">
+                  Didn’t create an account? Email us at <a href="mailto:{{ support_email }}" style="color:#6B6BF6;text-decoration:underline;">{{ support_email }}</a>.
+                </p>
+              </td>
+            </tr>
+
+            <tr>
+              <td class="muted" align="center" style="padding:26px 24px 32px;font:400 12px/1.6 Inter,Arial,sans-serif;color:#9ca3af;">
+                Sent by {{ app_name }} · © {{ year }}<br>
+                {{ company_address }}
+              </td>
+            </tr>
+
+          </table>
+        </td>
+      </tr>
+    </table>
   </body>
 </html>

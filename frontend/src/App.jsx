@@ -52,7 +52,7 @@ const AdminUsers = lazy(() => import('../admin/src/pages/Users').then(mod => ({ 
 const AdminCharacters = lazy(() =>
   import('../admin/src/pages/Characters').then((mod) => ({ default: mod.Characters || mod.default }))
 );
-const AdminSubscriptions = lazy(() => import('../admin/src/pages/Subscriptions').then(mod => ({ default: mod.Subscriptions || mod.default })));
+// AdminSubscriptions removed
 const AdminPricing = lazy(() => import('../admin/src/pages/PricingManagement').then(mod => ({ default: mod.PricingManagement || mod.default })));
 const AdminPromo = lazy(() => import('../admin/src/pages/PromoManagement').then(mod => ({ default: mod.PromoManagement || mod.default })));
 const AdminContentModeration = lazy(() => import('../admin/src/pages/ContentModeration').then(mod => ({ default: mod.ContentModeration || mod.default })));
@@ -271,7 +271,7 @@ export default function App() {
           <Route path="dashboard" element={<Suspense fallback={<div>Loading...</div>}><AdminDashboard /></Suspense>} />
           <Route path="users" element={<Suspense fallback={<div>Loading...</div>}><AdminUsers /></Suspense>} />
           <Route path="characters" element={<Suspense fallback={<div>Loading...</div>}><AdminCharacters /></Suspense>} />
-          <Route path="subscriptions" element={<Suspense fallback={<div>Loading...</div>}><AdminSubscriptions /></Suspense>} />
+          {/* subscriptions admin route removed */}
           <Route path="pricing" element={<Suspense fallback={<div>Loading...</div>}><AdminPricing /></Suspense>} />
           <Route path="promo" element={<Suspense fallback={<div>Loading...</div>}><AdminPromo /></Suspense>} />
           <Route path="content-moderation" element={<Suspense fallback={<div>Loading...</div>}><AdminContentModeration /></Suspense>} />

@@ -518,14 +518,16 @@ export const Users: React.FC = () => {
             InputProps={{
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search />
+                  <Search sx={{ fontSize: 18, opacity: 0.85 }} />
                 </InputAdornment>
               ),
             }}
             sx={{
-              minWidth: 280,
+              width: 180,
+              maxWidth: 180,
+              flex: '0 0 180px',
               '& .MuiOutlinedInput-root': { height: 36 },
-              '& .MuiOutlinedInput-input': { fontSize: 14, padding: '6px 12px' }
+              '& .MuiOutlinedInput-input': { fontSize: 13, padding: '4px 6px' }
             }}
           />
 
@@ -541,10 +543,11 @@ export const Users: React.FC = () => {
               fontWeight: 500,
               fontSize: 13.5,
               borderRadius: 9999,
-              px: 2,
+              px: 3,
               py: 1,
               height: 36,
               minHeight: 36,
+              minWidth: 150,
               display: 'inline-flex',
               alignItems: 'center',
               gap: 1,

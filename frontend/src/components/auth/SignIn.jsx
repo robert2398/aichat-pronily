@@ -60,10 +60,11 @@ export default function SignIn(){
       // Save user email for convenience
       localStorage.setItem('pronily:auth:email', email);
 
-      // Redirect to the saved background or root
-      const background = location.state && location.state.background;
-      if (background && background.pathname) {
-        navigate(background.pathname + (background.search || ""), { replace: true });
+      // Redirect to the saved return location (preferred), then background, then root
+      const state = location.state || {};
+      const returnTo = state.returnTo || (state.background && state.background.pathname ? (state.background.pathname + (state.background.search || "")) : null);
+      if (returnTo) {
+        navigate(returnTo, { replace: true });
       } else {
         navigate('/', { replace: true });
       }

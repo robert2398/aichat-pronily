@@ -197,3 +197,20 @@ html, body, #root {
 .user-page .MuiButton-root[aria-label="Create new user"]:hover {
   filter: brightness(0.95);
 }
+
+/* Force table cells to be left-aligned and top-aligned inside admin user pages. */
+.user-page .MuiTable-root td,
+.user-page .MuiTable-root th,
+.user-page .MuiTableBody-root td,
+.user-page .MuiTableCell-root {
+  text-align: left !important;
+  vertical-align: top !important;
+}
+
+/* Reduce excessive default cell padding that can cause visual gaps. These are conservative values; adjust if needed. */
+.user-page .MuiTableCell-root {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
