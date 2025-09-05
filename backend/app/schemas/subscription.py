@@ -3,9 +3,12 @@ from datetime import datetime
 from typing import Optional
 
 class CheckoutSessionRequest(BaseModel):
-    price_id: str
-    coupon: str
-    discount_applied: float
+    price_id: str | None = None
+    promo_code: str | None = None
+    discount_type: str | None = None
+    coupon: str | None = None
+    currency: str
+    discount_applied: float | None = None
     subtotal_at_apply: float
 
 class CheckoutSessionResponse(BaseModel):
@@ -31,9 +34,12 @@ class SubscriptionRead(SubscriptionBase):
 
 
 class PricingPlanRead(BaseModel):
-    plan_id: int
+    id: int
     plan_name: str
     pricing_id: str
+    stripe_promotion_id: str
+    stripe_coupon_id: str
+    coupon: str
     currency: str
     price: float
     discount: float
@@ -51,6 +57,9 @@ class PricingPlanRead(BaseModel):
 class PricingPlanCreate(BaseModel):
     plan_name: str
     pricing_id: str
+    stripe_promotion_id: str
+    stripe_coupon_id: str
+    coupon: str
     currency: str
     price: float
     discount: float
@@ -71,7 +80,7 @@ class PricingPlanUpdate(BaseModel):
 
 
 class PromoManagementRead(BaseModel):
-    promo_id: int
+    id: int
     promo_name: str
     coupon: str
     percent_off: float

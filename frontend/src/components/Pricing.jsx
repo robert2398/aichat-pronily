@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Check, X, ChevronLeft } from "lucide-react";
 
-function SegmentedBilling({ value, onChange }) {
+function SegmentedBilling({ value, onChange, maxAnnualPercent }) {
   const isAnnual = value === "annual";
   return (
     <div className="inline-flex items-center rounded-full border border-white/10 bg-white/[.04] p-1">
@@ -23,20 +23,24 @@ function SegmentedBilling({ value, onChange }) {
         type="button"
       >
         Annual
-        <span className="ml-1 rounded-full bg-white/20 text-[10px] px-1.5 py-[2px]">
-          36% off
-        </span>
+        {typeof maxAnnualPercent === 'number' && maxAnnualPercent > 0 ? (
+          <span className="ml-1 rounded-full bg-white/20 text-[10px] px-1.5 py-[2px]">
+            {maxAnnualPercent}% off
+          </span>
+        ) : null}
       </button>
     </div>
   );
 }
 
-function PricePill({ price, oldPrice, suffix = "/mo" }) {
+function PricePill({ price, oldPrice, suffix = "/mo", discountPercent }) {
   return (
     <div className="relative rounded-2xl border border-white/10 bg-white/[.06] px-4 py-3 flex items-center justify-between overflow-hidden">
       <div className="text-2xl font-bold">${price}<span className="text-base font-medium">{suffix}</span></div>
       <div className="flex items-center gap-2 text-xs">
-        <span className="rounded-md bg-orange-500/20 text-orange-300 px-2 py-0.5 font-semibold">31% off</span>
+        <span className="rounded-md bg-orange-500/20 text-orange-300 px-2 py-0.5 font-semibold">
+          {typeof discountPercent === 'number' ? `${Math.round(discountPercent)}% off` : '31% off'}
+        </span>
         {oldPrice ? <span className="text-white/70 line-through">${oldPrice}</span> : null}
       </div>
       {/* soft glass blobs */}
@@ -70,6 +74,7 @@ function PlanCard({
   blurb,
   features,
   onPay,
+  discount,
 }) {
   return (
     <div
@@ -86,7 +91,7 @@ function PlanCard({
       )}
 
       <h3 className="text-xl font-semibold mb-4">{title}</h3>
-      <PricePill price={priceCurrent} oldPrice={priceOld} suffix={per} />
+  <PricePill price={priceCurrent} oldPrice={priceOld} suffix={per} discountPercent={discount} />
       {blurb && (
         <p className="mt-2 text-sm text-white/70">
           {blurb}
@@ -119,6 +124,36 @@ export default function Pricing() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // compute maximum yearly discount percentage across plan pairs
+  const maxAnnualPercent = useMemo(() => {
+    if (!plans || plans.length === 0) return 0;
+    // group plans by plan_name (or plan_id) to find monthly vs yearly pairs
+    const groups = {};
+    for (const p of plans) {
+      const key = (p.plan_name || p.plan_id || '') + '::' + (p.currency || '');
+      groups[key] = groups[key] || [];
+      groups[key].push(p);
+    }
+
+    let max = 0;
+    for (const key of Object.keys(groups)) {
+      const items = groups[key];
+      const monthly = items.find(i => /month/i.test(i.billing_cycle || ''));
+      const yearly = items.find(i => /year/i.test(i.billing_cycle || ''));
+      if (monthly && yearly) {
+        // calculate percent: (yearly - monthly*12) relative to monthly*12
+        const monthlyTotal = Number(monthly.price || 0) * 12;
+        const yearlyPrice = Number(yearly.price || 0);
+        if (monthlyTotal > 0 && monthlyTotal > yearlyPrice) {
+          const percent = Math.round(((monthlyTotal - yearlyPrice) / monthlyTotal) * 100);
+          if (percent > max) max = percent;
+        }
+      }
+    }
+
+    return max;
+  }, [plans]);
 
   useEffect(() => {
     let mounted = true;
@@ -176,7 +211,7 @@ export default function Pricing() {
       <div className="text-center mb-4">
         <h1 className="text-2xl sm:text-3xl font-semibold">Pricing &amp; Membership</h1>
         <div className="mt-3 flex items-center justify-center">
-          <SegmentedBilling value={billing} onChange={setBilling} />
+          <SegmentedBilling value={billing} onChange={setBilling} maxAnnualPercent={maxAnnualPercent} />
         </div>
       </div>
 
@@ -204,8 +239,12 @@ export default function Pricing() {
               filtered.sort((a, b) => (Number(a.price || 0) - Number(b.price || 0)));
 
               return filtered.map((p, idx) => {
-                const priceCurrent = (p.price || 0).toFixed(2);
-                const priceOld = p.discount ? (p.price / (1 - p.discount / 100)).toFixed(2) : null;
+                // backend price is original (pre-discount) amount
+                const originalPrice = Number(p.price || 0);
+                const discountPct = Number(p.discount || 0) || 0;
+                const discountedPrice = originalPrice * (1 - discountPct / 100);
+                const priceCurrent = discountedPrice.toFixed(2);
+                const priceOld = originalPrice ? originalPrice.toFixed(2) : null;
                 const per = isAnnualSelected ? "/yr" : "/mo";
                 const features = [
                   { ok: true, text: `${p.coin_reward} coins per ${p.billing_cycle.toLowerCase()}` },
@@ -226,6 +265,7 @@ export default function Pricing() {
                       blurb={`${p.coin_reward} coins - ${p.billing_cycle}`}
                       features={features}
                       onPay={() => goCheckout(p)}
+                      discount={p.discount}
                     />
                   </div>
                 );

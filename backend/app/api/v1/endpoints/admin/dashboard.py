@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from app.api.v1.deps import get_db, require_admin
 from app.models.user import User
-from app.models.subscription import Subscription, PricingPlan, PromoManagement, PromoRedemption
+from app.models.subscription import Subscription, PricingPlan
 from app.models.chat import ChatMessage
 from app.models.character import Character  #, GenderEnum
 from app.models.usage_metrics import UsageMetrics

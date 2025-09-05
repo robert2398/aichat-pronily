@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
+import Modal from "./ui/Modal";
 
 export default function Verify() {
   const [searchParams] = useSearchParams();
@@ -9,11 +10,13 @@ export default function Verify() {
 
   const [promoList, setPromoList] = useState([]);
   const [selectedPromo, setSelectedPromo] = useState(null);
+  const [selectedPromoKey, setSelectedPromoKey] = useState(null);
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [verifyResult, setVerifyResult] = useState(null);
   const [pricingObj, setPricingObj] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [modal, setModal] = useState({ open: false, title: '', message: '' });
 
   useEffect(() => {
     let mounted = true;
@@ -71,7 +74,10 @@ export default function Verify() {
 
   // when a promo is selected call the verify endpoint to check validity
   const applyPromo = (promo) => {
-    setSelectedPromo(promo);
+  // compute stable key for this promo (same logic as in render)
+  const promoKey = promo?.promo_id ?? promo?.coupon ?? promo?.promo_name ?? null;
+  setSelectedPromo(promo);
+  setSelectedPromoKey(promoKey);
     setVerifyResult(null);
     if (!promo) return;
     const base = import.meta.env.VITE_API_BASE_URL || "";
@@ -106,7 +112,14 @@ export default function Verify() {
       })
       .then((data) => {
         if (!mounted) return;
-        setVerifyResult({ ok: !!data.valid, data });
+        const ok = !!data.valid;
+        setVerifyResult({ ok, data });
+        // If backend says promo is invalid, show a popup with the reason.
+        // If valid, do not apply any additional frontend validation (no-op).
+        if (!ok) {
+          const reason = data && (data.reason || data.message || data.detail) || 'Promo is not valid.';
+          setModal({ open: true, title: 'Promo invalid', message: reason });
+        }
       })
       .catch((err) => {
         if (!mounted) return;
@@ -117,8 +130,20 @@ export default function Verify() {
     return () => (mounted = false);
   };
 
+  const resetPromo = () => {
+    // clear selected promo and verification state, revert to pricing discount
+    setSelectedPromo(null);
+  setSelectedPromoKey(null);
+    setVerifyResult(null);
+    setVerifyLoading(false);
+    setModal({ open: false, title: '', message: '' });
+  };
+
   const confirm = () => {
     // Create a checkout session on the backend and redirect to Stripe Checkout
+    // set the loading state immediately so the UI shows processing feedback
+    setCreateLoading(true);
+    setCreateError(null);
     (async () => {
       setVerifyResult(null);
       setVerifyLoading(false);
@@ -135,20 +160,30 @@ export default function Verify() {
         const tokenOnly = stored.replace(/^bearer\s+/i, "").trim();
 
         // compute discount and subtotal to include in checkout payload
-        const priceValue = pricingObj ? Number(pricingObj.price || 0) : 0;
-        const percent = selectedPromo ? Number(selectedPromo.percent_off || 0) : 0;
-        const discountApplied = +(priceValue * (percent / 100));
-        const subtotalAtApply = +(priceValue - discountApplied);
+  const priceValue = pricingObj ? Number(pricingObj.price || 0) : 0;
+  // use promo only if it's been verified
+  const promoPercentUsed = (selectedPromo && verifyResult && verifyResult.ok) ? Number(selectedPromo.percent_off || 0) : 0;
+  const globalPercent = pricingObj ? Number(pricingObj.discount || 0) : 0;
+  const percent = promoPercentUsed || globalPercent || 0;
+  const discountApplied = +(priceValue * (percent / 100));
+  const subtotalAtApply = +(priceValue - discountApplied);
+  // discount_type: 'promo' when promo used, 'subscription' when global pricing discount used, otherwise 'none'
+  const discount_type = promoPercentUsed ? 'promo' : (globalPercent ? 'subscription' : 'none');
 
-        const payload = {
-          price_id: pricingId,
-          coupon: selectedPromo ? (selectedPromo.coupon || selectedPromo.promo_name) : "",
-          discount_applied: Number(discountApplied.toFixed(2)),
-          subtotal_at_apply: Number(subtotalAtApply.toFixed(2)),
-        };
+              // prefer verified selected promo coupon, otherwise use coupon from pricing object (global pricing coupon)
+              const couponToSend = (selectedPromo && verifyResult && verifyResult.ok) ? (selectedPromo.coupon || selectedPromo.promo_name) : (pricingObj ? (pricingObj.coupon || null) : null);
+              const discountTypeToSend = (selectedPromo && verifyResult && verifyResult.ok) ? 'promo' : (pricingObj && pricingObj.coupon ? 'subscription' : 'none');
 
-        setCreateLoading(true);
-        setCreateError(null);
+              const payload = {
+                price_id: pricingId || null,
+                discount_type: discountTypeToSend || null,
+                coupon: couponToSend || null,
+                currency: pricingObj ? (pricingObj.currency || null) : null,
+                discount_applied: percent ? Number(discountApplied.toFixed(2)) : null,
+                subtotal_at_apply: percent ? Number(subtotalAtApply.toFixed(2)) : null,
+              };
+
+  // createLoading is already set above (on click)
 
         const res = await fetch(url, {
           method: "POST",
@@ -211,10 +246,15 @@ export default function Verify() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-12">
       <h2 className="text-2xl font-bold mb-4">Verify &amp; Confirm</h2>
-      <p className="text-sm text-white/70 mb-4">Pricing: <span className="font-semibold">{pricingId || "(missing)"}</span></p>
+      
 
       <section className="rounded-lg border border-white/10 bg-white/[.03] p-4 mb-4">
-        <h3 className="font-semibold mb-2">Apply a promo</h3>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-semibold">Apply a promo</h3>
+          {(selectedPromo || verifyResult) && (
+            <button onClick={resetPromo} className="text-sm text-emerald-400 hover:underline">Reset</button>
+          )}
+        </div>
         {loading ? (
           <div>Loading promos…</div>
         ) : error ? (
@@ -223,15 +263,27 @@ export default function Verify() {
           <div className="text-sm text-white/70">No promos available</div>
         ) : (
           <div className="space-y-2">
-            {promoList.map((p) => (
-              <label key={p.promo_id} className={`flex items-center justify-between gap-4 rounded-md border p-3 ${selectedPromo && selectedPromo.promo_id === p.promo_id ? "bg-pink-700/20 border-pink-500" : "bg-transparent"}`}>
-                <div>
-                  <div className="font-semibold">{p.promo_name} <span className="ml-2 text-xs text-white/70">{p.coupon}</span></div>
-                  <div className="text-sm text-white/70">{p.percent_off}% off — expires {new Date(p.expiry_date).toLocaleDateString()}</div>
-                </div>
-                <input type="radio" name="promo" checked={selectedPromo && selectedPromo.promo_id === p.promo_id} onChange={() => applyPromo(p)} />
-              </label>
-            ))}
+            {promoList.map((p, idx) => {
+              const promoKey = p.promo_id ?? p.coupon ?? p.promo_name ?? `promo-${idx}`;
+              const inputId = `promo-${promoKey}`;
+              const isSelected = selectedPromoKey ? String(selectedPromoKey) === String(promoKey) : false;
+              return (
+                <label key={promoKey} htmlFor={inputId} className={`flex items-center justify-between gap-4 rounded-md border p-3 ${isSelected ? "bg-emerald-700/20 border-emerald-500" : "bg-transparent"}`}>
+                  <div>
+                    <div className="font-semibold">{p.promo_name} <span className="ml-2 text-xs text-white/70">{p.coupon}</span></div>
+                    <div className="text-sm text-white/70">{p.percent_off}% off — expires {new Date(p.expiry_date).toLocaleDateString()}</div>
+                  </div>
+                  <input
+                    id={inputId}
+                    type="radio"
+                    name="promo"
+                    value={p.promo_id ?? p.coupon ?? ''}
+                    checked={!!isSelected}
+                    onClick={() => applyPromo(p)}
+                  />
+                </label>
+              );
+            })}
           </div>
         )}
       </section>
@@ -244,17 +296,6 @@ export default function Verify() {
           verifyResult.ok ? (
             <div className="rounded-md border border-emerald-600 bg-emerald-900/20 p-3 text-emerald-300">
               <div>Promo valid: {selectedPromo ? `${selectedPromo.coupon} — ${selectedPromo.percent_off}% off` : ''}</div>
-              {pricingObj && selectedPromo && (
-                (() => {
-                  const priceValue = Number(pricingObj.price || 0);
-                  const percent = Number(selectedPromo.percent_off || 0);
-                  const discountApplied = +(priceValue * (percent / 100));
-                  const subtotal = +(priceValue - discountApplied);
-                  return (
-                    <div className="mt-2 text-sm text-emerald-200">Sub Total after discount: <span className="font-semibold">${subtotal.toFixed(2)}</span></div>
-                  );
-                })()
-              )}
             </div>
           ) : (
             <div className="rounded-md border border-red-600 bg-red-900/20 p-3 text-red-300">
@@ -264,10 +305,47 @@ export default function Verify() {
         ) : null}
       </div>
 
+      {/* Always show initial/rebill using verified promo or global discount */}
+      {pricingObj && (
+        (() => {
+          const priceValue = Number(pricingObj.price || 0);
+          // use promo only if it's been verified
+          const promoPercentUsed = (selectedPromo && verifyResult && verifyResult.ok) ? Number(selectedPromo.percent_off || 0) : 0;
+          const globalPercent = Number(pricingObj.discount || 0) || 0;
+          const percent = promoPercentUsed || globalPercent || 0;
+          const discountApplied = +(priceValue * (percent / 100));
+          const subtotal = +(priceValue - discountApplied);
+          const cycle = String(pricingObj.billing_cycle || '').toLowerCase();
+          const period = cycle.includes('year') ? 'year' : cycle.includes('month') ? 'month' : 'period';
+          return (
+            <div className="mb-4 text-sm text-emerald-200">
+              Initial payment: <span className="font-semibold">${subtotal.toFixed(2)}</span>
+              &nbsp;&amp;&nbsp;Rebill: <span className="font-semibold">${priceValue.toFixed(2)}</span> every {period}
+            </div>
+          );
+        })()
+      )}
+
       <div className="flex gap-3">
-        <button onClick={confirm} className="rounded-md bg-gradient-to-r from-pink-600 to-indigo-600 px-4 py-2 font-semibold">Confirm &amp; Pay</button>
+      </div>
+
+      <div className="flex gap-3">
+        <button
+          onClick={confirm}
+          disabled={createLoading}
+          aria-busy={createLoading ? 'true' : 'false'}
+          className={`rounded-md px-4 py-2 font-semibold text-white flex items-center gap-2 ${createLoading ? 'bg-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-pink-600 to-indigo-600'}`}>
+          {createLoading ? (
+            // simple spinner using border animation
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" aria-hidden="true"></span>
+          ) : null}
+          {createLoading ? 'Processing…' : 'Confirm & Pay'}
+        </button>
         <button onClick={() => navigate(-1)} className="rounded-md border px-4 py-2">Back</button>
       </div>
+      <Modal open={modal.open} title={modal.title} onClose={() => setModal({ open: false, title: '', message: '' })}>
+        {modal.message}
+      </Modal>
     </main>
   );
 }

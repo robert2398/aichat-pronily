@@ -29,13 +29,9 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
     # user relations
-    subscriptions = relationship("Subscription", back_populates="user")
-    promo_redemptions = relationship("PromoRedemption", back_populates="user")
     activation_tokens = relationship("UserActivation", back_populates="user", cascade="all, delete-orphan")
     # wallet and coin relations
-    user_wallet = relationship("UserWallet", back_populates="user", uselist=False)
     coin_transactions = relationship("CoinTransaction", back_populates="user")
-    media_items = relationship("Media", back_populates="user")
     # CharacterMedia relation (separate from generic Media table)
     character_media = relationship(
         "CharacterMedia",
@@ -46,7 +42,9 @@ class User(Base):
 
     # one-to-one profile relation
     profile = relationship("UserProfile", back_populates="user", uselist=False)
-
+    order = relationship("Order", back_populates="user")
+    user_wallet = relationship("UserWallet", back_populates="user")
+    subscription = relationship("Subscription", back_populates="user")
 
 class UserProfile(Base):
     __tablename__ = "user_profiles"

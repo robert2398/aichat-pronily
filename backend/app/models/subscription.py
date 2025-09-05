@@ -12,7 +12,7 @@ class Subscription(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     payment_customer_id = Column(String, nullable=False)
-    payment_subscription_id = Column(String, nullable=False)
+    order_id = Column(String, ForeignKey("orders.id"), nullable=False)
     price_id = Column(String, nullable=True)
     plan_name = Column(String, nullable=True)  # "pro" or "vip"
     status = Column(String, nullable=False)
@@ -24,27 +24,28 @@ class Subscription(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-
-    user = relationship("User", back_populates="subscriptions")
-
+    user = relationship("User", back_populates="subscription")
+    order = relationship("Order", back_populates="subscription")
 
 class PromoManagement(Base):
     __tablename__ = "promo_management"
 
-    promo_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)  # keep as internal PK
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)  # keep as internal PK
     promo_name = Column(String(255), nullable=False)
+    discount_type = Column(String(50), nullable=False)  # e.g. 'subscription', 'promo'
     coupon = Column(String(100), nullable=False, unique=True)  # human code (UPPER)
+    currency = Column(String(3), nullable=False, server_default='USD')
     percent_off = Column(Numeric(5, 2), nullable=False)
     stripe_promotion_id = Column(String(100), nullable=True, unique=True)   # NEW: stores promo_... id
     stripe_coupon_id = Column(String(100), nullable=True)  # optional: store coupon_... id
     start_date = Column(DateTime(timezone=True), nullable=True)
     expiry_date = Column(DateTime(timezone=True), nullable=True)
-    status = Column(String(20), nullable=False, server_default='Active')
+    status = Column(String(20), nullable=False, server_default='active')
     applied_count = Column(Integer, nullable=False, server_default='0')
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    redemptions = relationship("PromoRedemption", back_populates="promo")
 
+    orders = relationship("Order", back_populates="promo_management")
     __table_args__ = (
         CheckConstraint('coupon = UPPER(coupon)', name='chk_coupon_upper'),
         CheckConstraint('percent_off >= 0 AND percent_off <= 100', name='chk_percent_range'),
@@ -54,9 +55,12 @@ class PromoManagement(Base):
 class PricingPlan(Base):
     __tablename__ = "pricing_plan"
 
-    plan_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     plan_name = Column(String(255), nullable=False)
     pricing_id = Column(String(255), nullable=False)
+    stripe_promotion_id = Column(String(255), nullable=False)
+    stripe_coupon_id = Column(String(255), nullable=False)
+    coupon = Column(String(255), nullable=False)
     currency = Column(CHAR(3), nullable=False, server_default='USD')
     price = Column(Numeric(10, 2), nullable=False)
     discount = Column(Numeric(10, 2), nullable=True)
@@ -67,30 +71,26 @@ class PricingPlan(Base):
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
 
-class PromoRedemption(Base):
-    __tablename__ = "promo_redemption"
+class Order(Base):
+    __tablename__ = "orders"
 
-    redemption_id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
-    promo_id = Column(BigInteger, ForeignKey("promo_management.promo_id", ondelete="RESTRICT"), nullable=False)
-    promo_code = Column(String(100), nullable=False)
+    id = Column(BigInteger, primary_key=True, index=True, autoincrement=True)
+    promo_id = Column(BigInteger, ForeignKey("promo_management.id", ondelete="RESTRICT"), nullable=True)
+    promo_code = Column(String(100), nullable=True)
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
-    order_id = Column(BigInteger, unique=True, nullable=True)  # keep if you use your own order IDs
-    stripe_invoice_id = Column(String(100), nullable=True)   # NEW: store Stripe invoice id (in_...)
+    stripe_customer_id = Column(String(100), nullable=False)
+    order_id = Column(String(100), unique=True, nullable=True)  # keep if you use your own order IDs
+    discount_type = Column(String(100), nullable=True)  # e.g. 'subscription', 'promo'
     applied_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    discount_applied = Column(Numeric(10, 2), nullable=False)
-    subtotal_at_apply = Column(Numeric(10, 2), nullable=True)
+    discount_applied = Column(Numeric(10, 2), server_default='0', nullable=False)
+    subtotal_at_apply = Column(Numeric(10, 2), nullable=False)
     currency = Column(CHAR(3), nullable=False, server_default='USD')
     status = Column(String(20), nullable=False, server_default='pending')  # 'pending', 'redeemed', 'failed'
-    promo = relationship("PromoManagement", back_populates="redemptions")
-    user = relationship("User", back_populates="promo_redemptions")
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    __table_args__ = (
-        CheckConstraint('promo_code = UPPER(promo_code)', name='chk_code_upper'),
-        # unique constraint to avoid duplicate redemption rows for same promo+user+invoice
-        UniqueConstraint('promo_id', 'user_id', 'stripe_invoice_id', name='ux_promo_user_invoice')
-    )
-
-
+    promo_management = relationship("PromoManagement", back_populates="orders")
+    user = relationship("User", back_populates="order")
+    subscription = relationship("Subscription", back_populates="order")
 
 class UserWallet(Base):
     __tablename__ = "user_wallets"
@@ -100,7 +100,7 @@ class UserWallet(Base):
     coin_balance = Column(Integer, nullable=False, server_default='0')
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
 
-    user = relationship("User")
+    user = relationship("User", back_populates="user_wallet")
 
 class CoinTransaction(Base):
     __tablename__ = "coin_transactions"
@@ -108,10 +108,10 @@ class CoinTransaction(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     subscription_id = Column(Integer, ForeignKey("subscriptions.id"), nullable=True)
-    coins = Column(Integer, nullable=False)  # positive for earn, negative for spend
+    transaction_type = Column(String(50), nullable=False)  # e.g. 'debit', 'credit'
+    coins = Column(Integer, nullable=False)
     source_type = Column(String(50), nullable=False)  # e.g. 'subscription', 'purchase', 'image', 'video', 'character'
-    source_id = Column(Integer, nullable=True)
-    description = Column(Text, nullable=True)
+    order_id = Column(String(100), nullable=False)
     period_start = Column(DateTime, nullable=True)
     period_end = Column(DateTime, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)

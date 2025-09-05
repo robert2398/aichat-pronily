@@ -8,6 +8,7 @@ from sqlalchemy import select, delete, insert, update
 from fastapi.responses import RedirectResponse
 from sqlalchemy.exc import IntegrityError
 from app.schemas.user import UserCreate
+from app.models.subscription import UserWallet
 from app.schemas.auth import (
     LoginRequest,
     LoginResponse,
@@ -265,6 +266,17 @@ async def verify_email(uid: uuid.UUID, token: str, db: AsyncSession = Depends(ge
         db.add(new_profile)
     await db.commit()
 
+    """
+    Get the user's coin balance.
+    """
+    stmt = select(UserWallet).where(UserWallet.user_id == user.id)
+    result = await db.execute(stmt)
+    user_wallet = result.scalar_one_or_none()
+    if not user_wallet:
+        user_wallet = UserWallet(user_id=user.id)
+        user_wallet.coin_balance = int(await get_config_value_from_cache("SIGNUP_COIN_REWARD"))
+        db.add(user_wallet)
+    await db.commit()
 
     ### --- AUTO-LOGIN LOGIC ---
     access_token = create_access_token(str(user.id))
