@@ -12,6 +12,7 @@ import Verify from "./components/Verify";
 import VerifyConfirm from "./components/VerifyConfirm";
 import Success from "./components/Success";
 import Cancel from "./components/Cancel";
+import BuyGems from "./components/BuyGems";
 import StoryGenerator from "./components/StoryGenerator";
 import GameGenerator from "./components/GameGenerator";
 import FaqSection from "./components/FaqSection";
@@ -253,6 +254,14 @@ export default function App() {
           element={
             <main className="mx-auto max-w-7xl px-4 py-12">
               <Pricing />
+            </main>
+          }
+        />
+        <Route
+          path="/buy-gems"
+          element={
+            <main className="mx-auto max-w-7xl px-4 py-12">
+              <BuyGems />
             </main>
           }
         />

@@ -12,6 +12,7 @@ class Subscription(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     payment_customer_id = Column(String, nullable=False)
+    subscription_id = Column(String, nullable=False, unique=True)
     order_id = Column(String, ForeignKey("orders.id"), nullable=False)
     price_id = Column(String, nullable=True)
     plan_name = Column(String, nullable=True)  # "pro" or "vip"
@@ -79,6 +80,7 @@ class Order(Base):
     promo_code = Column(String(100), nullable=True)
     user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False)
     stripe_customer_id = Column(String(100), nullable=False)
+    subscription_id = Column(String(100), nullable=True)  # Stripe subscription ID
     order_id = Column(String(100), unique=True, nullable=True)  # keep if you use your own order IDs
     discount_type = Column(String(100), nullable=True)  # e.g. 'subscription', 'promo'
     applied_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -107,7 +109,7 @@ class CoinTransaction(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    subscription_id = Column(Integer, ForeignKey("subscriptions.id"), nullable=True)
+    subscription_id = Column(String(100), ForeignKey("subscriptions.subscription_id"), nullable=True)
     transaction_type = Column(String(50), nullable=False)  # e.g. 'debit', 'credit'
     coins = Column(Integer, nullable=False)
     source_type = Column(String(50), nullable=False)  # e.g. 'subscription', 'purchase', 'image', 'video', 'character'
@@ -135,3 +137,16 @@ class Media(Base):
         CheckConstraint("media_type IN ('image','video','character')", name='chk_media_type'),
     )
 
+
+class CoinPurchase(Base):
+    __tablename__ = "coin_purchases"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    plan_name = Column(String(255), nullable=False)
+    pricing_id = Column(String(255), nullable=False)
+    currency = Column(CHAR(3), nullable=False, server_default='USD')
+    price = Column(Numeric(10, 2), nullable=False)
+    discount = Column(Numeric(10, 2), nullable=True)
+    coin_reward = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)

@@ -4,8 +4,9 @@ from sqlalchemy.future import select
 from typing import List
 import stripe
 from app.api.v1.deps import get_db, require_admin
-from app.models.subscription import PricingPlan, PromoManagement, UserWallet
+from app.models.subscription import CoinPurchase, PricingPlan, PromoManagement, UserWallet
 from app.schemas.subscription import PricingPlanRead, PromoManagementRead, PromoVerifyRequest
+from app.services.app_config import get_config_value_from_cache
 from app.core.config import settings
 from app.api.v1.deps import get_current_user
 from sqlalchemy.sql import func
@@ -22,7 +23,7 @@ async def get_pricing(db: AsyncSession = Depends(get_db)):
     """
     Retrieve all pricing plans.
     """
-    result = await db.execute(select(PricingPlan).order_by(PricingPlan.id))
+    result = await db.execute(select(PricingPlan).where(PricingPlan.billing_cycle != "One Time").order_by(PricingPlan.id))
     pricing_plans = result.scalars().all()
     return pricing_plans
 
@@ -126,3 +127,28 @@ async def get_user_coin(user=Depends(get_current_user), db: AsyncSession = Depen
         raise HTTPException(status_code=404, detail="User wallet not found")
 
     return user_wallet
+
+@router.get("/coin-cost")
+async def get_coin_cost(db: AsyncSession = Depends(get_db)):
+    """
+    Get the coin cost consumption cost for chat, video, and image.
+    """
+    chat_cost = await get_config_value_from_cache("CHAT_COST")
+    character_cost = await get_config_value_from_cache("CHARACTER_COST")
+    image_cost = await get_config_value_from_cache("IMAGE_COST")
+    video_cost = await get_config_value_from_cache("VIDEO_COST")
+
+    return {
+        "chat_cost": int(chat_cost) if chat_cost else 1,
+        "character_cost": int(character_cost) if character_cost else 6,
+        "image_cost": int(image_cost) if image_cost else 5,
+        "video_cost": int(video_cost) if video_cost else 10,
+    }
+@router.get("/get-coin-pricing")
+async def get_coin_pricing (db: AsyncSession = Depends(get_db)):
+    """
+    Get the coin purchase pricing plans.
+    """
+    result = await db.execute(select(PricingPlan).where(PricingPlan.billing_cycle == "One Time").order_by(PricingPlan.coin_reward))
+    coin_plans = result.scalars().all()
+    return coin_plans

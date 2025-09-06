@@ -4,6 +4,23 @@ import { Menu, X, Search } from "lucide-react";
 import Dropdown from "./ui/Dropdown";
 // using the header logo in /img/tripleminds_logo.jpg
 
+function IconGem({ className = 'w-4 h-4' }) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+      <defs>
+        <linearGradient id="gemGradSmall" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#FF66C4" />
+          <stop offset="1" stopColor="#FF2EA6" />
+        </linearGradient>
+      </defs>
+      <path d="M10 1 L17 8 L10 19 L3 8 Z" fill="url(#gemGradSmall)"/>
+      <path d="M10 1 L13.5 8 L6.5 8 Z" fill="#FFFFFF" opacity=".25"/>
+      <path d="M3 8 L6.5 8 L10 19 Z" fill="#000000" opacity=".07"/>
+      <path d="M17 8 L13.5 8 L10 19 Z" fill="#000000" opacity=".07"/>
+    </svg>
+  );
+}
+
 export default function Header() {
   const [open, setOpen] = useState(false);
   const navigate = useNavigate();
@@ -21,6 +38,9 @@ export default function Header() {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [coinBalance, setCoinBalance] = useState(null);
+  const [gemsOpen, setGemsOpen] = useState(false);
+  const [coinCosts, setCoinCosts] = useState(null);
+  const [coinCostsLoading, setCoinCostsLoading] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const lastTokenRef = useRef(null);
@@ -39,6 +59,32 @@ export default function Header() {
     } catch (err) {
       console.warn("Failed to fetch coin balance", err);
       setCoinBalance(null);
+    }
+  }
+
+  // fetch costs like chat_cost,image_cost,video_cost,character_cost
+  async function fetchCoinCosts(token) {
+    try {
+      setCoinCostsLoading(true);
+      const base = import.meta.env.VITE_API_BASE_URL || "";
+      const url = `${base.replace(/\/$/, '')}/subscription/coin-cost`;
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const data = await res.json();
+      // normalize per sample response
+      setCoinCosts({
+        chat_cost: Number(data.chat_cost ?? data.chatCost ?? data.chat_cost) || 1,
+        character_cost: Number(data.character_cost ?? data.characterCost ?? data.character_cost) || 6,
+        image_cost: Number(data.image_cost ?? data.imageCost ?? data.image_cost) || 5,
+        video_cost: Number(data.video_cost ?? data.videoCost ?? data.video_cost) || 10,
+      });
+    } catch (err) {
+      console.warn('Failed to fetch coin costs', err);
+      setCoinCosts(null);
+    } finally {
+      setCoinCostsLoading(false);
     }
   }
 
@@ -133,6 +179,27 @@ export default function Header() {
       clearInterval(interval);
     };
   }, [location]);
+
+  // close gems banner on outside click or escape
+  useEffect(() => {
+    function onDocClick(e) {
+      // if click happened outside any open gems popover, close it
+      if (!e?.target) return;
+      // simple approach: if clicked element is inside a button that toggles gems, skip
+      const path = e.composedPath ? e.composedPath() : (e.path || []);
+      const insideGems = path.some((el) => el?.getAttribute && el.getAttribute('aria-label') === 'Gems balance');
+      if (!insideGems) setGemsOpen(false);
+    }
+    function onKey(e) {
+      if (e.key === 'Escape') setGemsOpen(false);
+    }
+    document.addEventListener('click', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('click', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, []);
 
   // When we have a token, fetch the authoritative profile to get profile_image_url and full_name
   useEffect(() => {
@@ -284,9 +351,12 @@ export default function Header() {
             ) : (
               <div className="flex items-center gap-3">
                 {/* GEMS */}
+                <div className="relative">
                 <button
+                  onClick={async (e) => { e.stopPropagation(); const next = !gemsOpen; setGemsOpen(next); if (next) await fetchCoinCosts(token); }}
                   className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 text-sm font-medium text-white/90 bg-white/10 ring-1 ring-white/10 hover:bg-white/15 focus:outline-none"
                   aria-label="Gems balance"
+                  aria-expanded={gemsOpen}
                 >
                   {/* Diamond gem w/ facets */}
                   <svg
@@ -313,6 +383,42 @@ export default function Header() {
                   <span className="leading-none">{coinBalance ?? 0} gems</span>
                   <span className="text-pink-300 text-base leading-none">+</span>
                 </button>
+
+                {gemsOpen ? (
+                  <div className="absolute right-0 mt-2 w-64 rounded-xl bg-[#0b0710] text-white shadow-lg ring-1 ring-white/10 py-3 z-50">
+                    <div className="px-3 text-sm text-white/60">Gems cost</div>
+                    <div className="mt-1 grid gap-1 px-3">
+                      {coinCostsLoading ? (
+                        <div className="text-sm text-white/60">Loading…</div>
+                      ) : coinCosts ? (
+                        <>
+                          <div className="flex items-center justify-between text-sm px-2 py-1 rounded-md hover:bg-white/5">
+                            <div>Chat cost</div>
+                            <div className="font-mono flex items-center gap-2"><span>{coinCosts.chat_cost}</span> <IconGem className="w-4 h-4" /></div>
+                          </div>
+                          <div className="flex items-center justify-between text-sm px-2 py-1 rounded-md hover:bg-white/5">
+                            <div>Image cost</div>
+                            <div className="font-mono flex items-center gap-2"><span>{coinCosts.image_cost}</span> <IconGem className="w-4 h-4" /></div>
+                          </div>
+                          <div className="flex items-center justify-between text-sm px-2 py-1 rounded-md hover:bg-white/5">
+                            <div>Video cost</div>
+                            <div className="font-mono flex items-center gap-2"><span>{coinCosts.video_cost}</span> <IconGem className="w-4 h-4" /></div>
+                          </div>
+                          <div className="flex items-center justify-between text-sm px-2 py-1 rounded-md hover:bg-white/5">
+                            <div>Character cost</div>
+                            <div className="font-mono flex items-center gap-2"><span>{coinCosts.character_cost}</span> <IconGem className="w-4 h-4" /></div>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-sm text-white/60">Failed to load costs</div>
+                      )}
+                    </div>
+                    <div className="mt-3 px-3">
+                      <button onClick={() => { setGemsOpen(false); navigate('/buy-gems'); }} className="w-full rounded-md bg-gradient-to-r from-pink-600 to-indigo-600 px-3 py-2 text-sm font-semibold">+ Buy more</button>
+                    </div>
+                  </div>
+                ) : null}
+                </div>
 
                 <Dropdown
                   onOpenChange={(v) => setProfileOpen(v)}
@@ -474,3 +580,4 @@ export default function Header() {
     </header>
   );
 }
+

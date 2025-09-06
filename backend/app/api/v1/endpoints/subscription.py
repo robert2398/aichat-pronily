@@ -75,8 +75,9 @@ async def create_checkout_session(
                 promo_code=promo_code,
                 user_id=user.id,
                 stripe_customer_id=stripe_cust_id,
+                subscription_id=None,
                 order_id=None,
-                discount_type=discount_type,
+                discount_type=payload.discount_type,
                 discount_applied=discount_applied,
                 subtotal_at_apply=payload.subtotal_at_apply,
                 currency=payload.currency,
@@ -84,12 +85,15 @@ async def create_checkout_session(
             )
     db.add(order)
     await db.commit()
-    
+    if payload.discount_type == "coin_purchase":
+        payment_type = "payment"
+    else:   
+        payment_type = "subscription"       
     session = stripe.checkout.Session.create(
         customer=customer.id,
         payment_method_types=["card"],
         line_items=[{"price": payload.price_id, "quantity": 1}],
-        mode="subscription",
+        mode=payment_type,
         discounts=[{"promotion_code": stripe_promotion_id}] if stripe_promotion_id else None,
         success_url=frontend_url + "/success?session_id={CHECKOUT_SESSION_ID}",
         cancel_url=frontend_url + "/cancel",
@@ -110,105 +114,209 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
     # ✅ Subscription created
     if event["type"] == "checkout.session.completed":
+        
         session = event["data"]["object"]
         customer_id = session["customer"]
-        subscription_id = session["subscription"]
-        stripe_sub = stripe.Subscription.retrieve(subscription_id)
-        print("stripe_sub:", stripe_sub)
-        price_id = stripe_sub["items"]["data"][0]["price"]["id"]
-        plan_name = stripe_sub["items"]["data"][0]["price"].get("nickname")
-        # Use safe .get() because webhook payloads can omit timestamps
-        cpe_ts = stripe_sub.get("current_period_end")
-        cps_ts = stripe_sub.get("current_period_start")
-        current_period_end = datetime.fromtimestamp(cpe_ts) if cpe_ts else None
-        current_period_start = datetime.fromtimestamp(cps_ts) if cps_ts else None
-        email = session.get("customer_email") or session.get("email")
 
-        # Find user
-        result = await db.execute(select(User).where(User.payment_customer_id == customer_id))
-        user = result.scalar_one_or_none()
-        if not user and email:
-            result = await db.execute(select(User).where(User.email == email))
+        # NEW: branch by mode
+        if session.get("mode") == "payment":
+            # --- ONE-TIME CHECKOUT FLOW ---
+            # get the line items so we can see which price was purchased
+            cs = stripe.checkout.Session.retrieve(session["id"], expand=["line_items"])
+            li = (cs.get("line_items", {}) or {}).get("data", [{}])[0]
+            price = (li or {}).get("price") or {}
+            price_id = price.get("id")
+
+            pricing = await get_pricing(price_id, db)
+            plan_name = pricing.plan_name if pricing else "One-time"
+            billing_cycle = "one time"
+
+            # use payment_intent as your "order id" for one-time purchases
+            order_id = session.get("payment_intent")
+            email = session.get("customer_email") or session.get("email")
+
+            # Find the user (same as your existing logic)
+            result = await db.execute(select(User).where(User.payment_customer_id == customer_id))
             user = result.scalar_one_or_none()
-        # Reward coins
-        pricing = await get_pricing(price_id, db)
-        coins = int(pricing.coin_reward or 0) if pricing else 0
-        if user:
-            # ensure customer's id stored on the user
-            user.payment_customer_id = customer_id
-            await db.commit()
-
-            # Try to find an existing subscription by Stripe subscription id (order_id)
-            existing_res = await db.execute(select(Subscription).where(Subscription.payment_customer_id == customer_id))
-            existing_sub = existing_res.scalar_one_or_none()
-
-            if existing_sub:
-                # update existing subscription fields
-                existing_sub.user_id = user.id
-                existing_sub.order_id = subscription_id
-                existing_sub.price_id = price_id
-                existing_sub.plan_name = plan_name
-                existing_sub.status = "active"
-                existing_sub.current_period_end = current_period_end
-                existing_sub.last_rewarded_period_end = current_period_end
-                sub = existing_sub
+            if not user and email:
+                result = await db.execute(select(User).where(User.email == email))
+                user = result.scalar_one_or_none()
+            sub = await db.execute(select(Subscription).where(Subscription.payment_customer_id == customer_id))
+            sub = sub.scalar_one_or_none()
+            subscription_id = sub.subscription_id if sub else None
+            coins = int(pricing.coin_reward or 0) if pricing else 0
+            if user:
+                # ensure customer id stored
+                user.payment_customer_id = customer_id
                 await db.commit()
-            else:
-                # create new subscription record
-                sub = Subscription(
+
+                # Record coin transaction as one-time purchase
+                tx = CoinTransaction(
                     user_id=user.id,
-                    payment_customer_id=customer_id,
-                    order_id=subscription_id,
-                    price_id=price_id,
-                    plan_name=plan_name,
-                    status="active",
-                    current_period_end=current_period_end,
-                    last_rewarded_period_end=current_period_end,
-                    total_coins_rewarded=coins,
+                    subscription_id=subscription_id,
+                    transaction_type="credit",
+                    coins=coins,
+                    source_type="coin_purchase",
+                    order_id=order_id,
+                    period_start=None,
+                    period_end=None,
                 )
-                db.add(sub)
+                db.add(tx)
                 await db.commit()
 
-            # Create coin transaction (do not pass order_id field if DB doesn't have it)
-            tx = CoinTransaction(
-                user_id=user.id,
-                subscription_id=sub.id,
-                transaction_type='credit',
-                coins=coins,
-                source_type="subscription",
-                order_id=subscription_id,  # new field
-                period_start=current_period_start,
-                period_end=current_period_end
-            )
-            db.add(tx)
-            await db.commit()
-            # Update wallet
-            wallet_res = await db.execute(select(UserWallet).where(UserWallet.user_id == user.id))
-            wallet = wallet_res.scalars().first()
-            if wallet:
-                wallet.coin_balance = (wallet.coin_balance or 0) + coins
-            else:
-                wallet = UserWallet(user_id=user.id, coin_balance=coins)
-                db.add(wallet)
-            await db.commit()
-            #if session.get("total_details", {}).get("amount_discount"):
-                # Find pending redemption for this user
-            res = await db.execute(
-                select(Order).where(
-                    Order.user_id == user.id,
-                    Order.stripe_customer_id == user.payment_customer_id,
-                    Order.status == "pending"
-                )
-            )
-            order = res.scalars().first()
-            if order:
-                order.status = "success"
-                order.redeemed_at = datetime.now(timezone.utc)
-                promo_res = await db.execute(select(PromoManagement).where(PromoManagement.promo_id == order.promo_id))
-                promo = promo_res.scalars().first()
-                if promo:
-                    promo.applied_count += 1
+                # Update wallet
+                wallet_res = await db.execute(select(UserWallet).where(UserWallet.user_id == user.id))
+                wallet = wallet_res.scalars().first()
+                if wallet:
+                    wallet.coin_balance = (wallet.coin_balance or 0) + coins
+                else:
+                    wallet = UserWallet(user_id=user.id, coin_balance=coins)
+                    db.add(wallet)
                 await db.commit()
+
+                # Close the pending Order row you created pre-checkout
+                res = await db.execute(
+                    select(Order).where(
+                        Order.user_id == user.id,
+                        Order.stripe_customer_id == user.payment_customer_id,
+                        Order.status == "pending"
+                    ).order_by(Order.id.desc())
+                )
+                order = res.scalars().first()
+                if order:
+                    order.status = "success"
+                    order.order_id = order_id
+                    order.subscription_id = subscription_id
+                    await db.commit()
+
+            return {"status": "success"}
+        else:
+            # --- SUBSCRIPTION FLOW (your existing code) ---
+            subscription_id = session["subscription"]
+            stripe_sub = stripe.Subscription.retrieve(subscription_id)
+
+            stripe_sub = stripe.Subscription.retrieve(subscription_id)
+            print("stripe_sub:", stripe_sub)
+            first_item = (stripe_sub.get("items", {}) or {}).get("data", [{}])[0]
+            price = (first_item or {}).get("price") or {}
+            price_id = price.get("id")
+            pricing = await get_pricing(price_id, db)
+            if pricing:
+                plan_name = pricing.plan_name
+                billing_cycle = pricing.billing_cycle.lower()
+
+            # # Use safe .get() because webhook payloads can omit timestamps
+            cpe_ts = stripe_sub.get("current_period_end")
+            cps_ts = stripe_sub.get("current_period_start")
+            current_period_end = datetime.fromtimestamp(cpe_ts) if cpe_ts else None
+            current_period_start = datetime.fromtimestamp(cps_ts) if cps_ts else None
+            email = session.get("customer_email") or session.get("email")
+            order_id = stripe_sub.get("latest_invoice")
+
+            print_val ={
+                "customer_id": customer_id,
+                "subscription_id": subscription_id,
+                "price_id": price_id,
+                "plan_name": plan_name,
+                "current_period_start": current_period_start,
+                "current_period_end": current_period_end,
+                "email": email,
+                "latest_invoice_id": order_id
+            }
+
+            print("Extracted values:", print_val)
+            # Find user
+            result = await db.execute(select(User).where(User.payment_customer_id == customer_id))
+            user = result.scalar_one_or_none()
+            if not user and email:
+                result = await db.execute(select(User).where(User.email == email))
+                user = result.scalar_one_or_none()
+            # Reward coins
+            
+            coins = int(pricing.coin_reward or 0) if pricing else 0
+            if user:
+                # ensure customer's id stored on the user
+                user.payment_customer_id = customer_id
+                await db.commit()
+                ## subscription entries are not created for one-time purchases like coins
+                
+                source_type = "subscription"
+                # Try to find an existing subscription by Stripe subscription id (order_id)
+                existing_res = await db.execute(select(Subscription).where(Subscription.payment_customer_id == customer_id))
+                existing_sub = existing_res.scalar_one_or_none()
+
+                if existing_sub:
+                    # update existing subscription fields
+                    existing_sub.user_id = user.id
+                    existing_sub.subscription_id = subscription_id
+                    existing_sub.order_id = order_id
+                    existing_sub.price_id = price_id
+                    existing_sub.plan_name = plan_name
+                    existing_sub.status = "active"
+                    existing_sub.current_period_end = current_period_end
+                    existing_sub.last_rewarded_period_end = current_period_end
+                    sub = existing_sub
+                    await db.commit()
+                else:
+                    # create new subscription record
+                    sub = Subscription(
+                        user_id=user.id,
+                        payment_customer_id=customer_id,
+                        subscription_id=subscription_id,
+                        order_id=order_id,
+                        price_id=price_id,
+                        plan_name=plan_name,
+                        status="active",
+                        current_period_end=current_period_end,
+                        last_rewarded_period_end=current_period_end,
+                        total_coins_rewarded=coins,
+                    )
+                    db.add(sub)
+                    await db.commit()
+                    
+                # Create coin transaction (do not pass order_id field if DB doesn't have it)
+                tx = CoinTransaction(
+                    user_id=user.id,
+                    subscription_id=subscription_id,
+                    transaction_type='credit',
+                    coins=coins,
+                    source_type=source_type,
+                    order_id=order_id,  # new field
+                    period_start=current_period_start,
+                    period_end=current_period_end
+                )
+                db.add(tx)
+                await db.commit()
+                # Update wallet
+                wallet_res = await db.execute(select(UserWallet).where(UserWallet.user_id == user.id))
+                wallet = wallet_res.scalars().first()
+                if wallet:
+                    wallet.coin_balance = (wallet.coin_balance or 0) + coins
+                else:
+                    wallet = UserWallet(user_id=user.id, coin_balance=coins)
+                    db.add(wallet)
+                await db.commit()
+                #if session.get("total_details", {}).get("amount_discount"):
+                    # Find pending redemption for this user
+                res = await db.execute(
+                    select(Order).where(
+                        Order.user_id == user.id,
+                        Order.stripe_customer_id == user.payment_customer_id,
+                        Order.status == "pending"
+                    )
+                )
+                order = res.scalars().first()
+                print('order from db : ',  order)
+                if order:
+                    order.status = "success"
+                    order.order_id = order_id
+                    order.subscription_id = subscription_id
+                    await db.commit()
+                    promo_res = await db.execute(select(PromoManagement).where(PromoManagement.id == order.promo_id))
+                    promo = promo_res.scalars().first()
+                    if promo:
+                        promo.applied_count += 1
+                    await db.commit()
 
     # ✅ Renewal / Plan update /Cancellation/ Deletion
     elif event["type"] in ["customer.subscription.updated", "customer.subscription.deleted"]:
@@ -221,13 +329,12 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         current_period_end = datetime.fromtimestamp(cpe_ts) if cpe_ts else None
         current_period_start = datetime.fromtimestamp(cps_ts) if cps_ts else None
         price_id = sub_obj["items"]["data"][0]["price"]["id"] if sub_obj.get("items") and sub_obj["items"].get("data") else None
-        plan_name = None
-        try:
-            plan_name = sub_obj["items"]["data"][0]["price"].get("nickname")
-        except Exception:
-            plan_name = None
+        plan_name = price.get("nickname")
+        pricing = await get_pricing(price_id, db)
+        if not plan_name and pricing:
+            plan_name = pricing.plan_name
+        order_id = stripe_sub.get("latest_invoice")
         customer_id = sub_obj["customer"]
-
         result = await db.execute(select(User).where(User.payment_customer_id == customer_id))
         user = result.scalar_one_or_none()
         if user:
@@ -238,19 +345,11 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             )
             sub = result.scalars().first()
 
-            # existing_sub.user_id = user.id
-            #     existing_sub.order_id = subscription_id
-            #     existing_sub.price_id = price_id
-            #     existing_sub.plan_name = plan_name
-            #     existing_sub.status = "active"
-            #     existing_sub.current_period_end = current_period_end
-            #     existing_sub.last_rewarded_period_end = current_period_end
-            #     sub = existing_sub
-
             if sub:
                 old_price_id = sub.price_id
                 old_period_end = sub.current_period_end
-                sub.order_id = subscription_id
+                sub.order_id = order_id
+                sub.subscription_id = subscription_id
                 sub.status = status
                 sub.current_period_end = current_period_end
                 sub.last_rewarded_period_end = current_period_end
