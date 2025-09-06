@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
 
 function Thumb({ item, onOpen, onDownload, isDownloading = false }) {
@@ -93,12 +93,22 @@ const getMediaUrl = (item) => {
 
 export default function Gallery() {
   const navigate = useNavigate();
+  const location = useLocation();
   console.log('Gallery component mounted');
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [viewer, setViewer] = useState(null); // item or null
   const [downloading, setDownloading] = useState(null); // url string while downloading
+  // simple client-side auth check (only local user token matters for UI behaviour)
+  const isLoggedIn = (() => {
+    try {
+      const t = localStorage.getItem('pronily:auth:token');
+      return !!t;
+    } catch (e) {
+      return false;
+    }
+  })();
 
   // derive a sensible filename from an s3 url
   const getFilenameFromUrl = (url) => {
@@ -237,102 +247,143 @@ export default function Gallery() {
     }
   };
 
-  useEffect(() => {
-  const CACHE_KEY = 'pronily:gallery:cache';
-  const CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours
-
-  const onOpen = () => console.log('open:gallery event received');
-  window.addEventListener('open:gallery', onOpen);
-
-  const fetchGallery = async (force = false) => {
-      console.log('Gallery: fetchGallery start (force=', !!force, ')');
-      setLoading(true);
-      setError(null);
-      try {
-        // Try cache first unless forced
-        if (!force) {
-          try {
-            const raw = localStorage.getItem(CACHE_KEY);
-            if (raw) {
-              const parsed = JSON.parse(raw);
-              if (parsed && parsed.expiresAt && Number(parsed.expiresAt) > Date.now() && Array.isArray(parsed.items)) {
-                console.log('Gallery: using cached items', parsed.items.length);
-                setItems(parsed.items);
-                setLoading(false);
-                return;
-              }
-            }
-          } catch (e) {
-            console.warn('Gallery: cache read failed', e);
-          }
-        }
-
-        const base = import.meta.env.VITE_API_BASE_URL;
-        console.log('Gallery: VITE_API_BASE_URL=', base);
-        if (!base) throw new Error('API base not configured');
-        const url = `${base.replace(/\/$/, '')}/characters/media/get-users-character-media`;
-        console.log('Gallery: fetch url=', url);
-        const headers = { 'Content-Type': 'application/json' };
-        const stored = localStorage.getItem('pronily:auth:token');
-        if (stored) {
-          const tokenOnly = stored.replace(/^bearer\s+/i, '').trim();
-          headers['Authorization'] = `bearer ${tokenOnly}`;
-        } else if (import.meta.env.VITE_API_AUTH_TOKEN) {
-          headers['Authorization'] = import.meta.env.VITE_API_AUTH_TOKEN;
-        }
-        const res = await fetch(url, { headers });
-        console.log('Gallery: fetch completed, status=', res.status);
-        if (!res.ok) {
-          // try to parse known JSON error shapes and treat "no images found" as empty
-          let parsed = null;
-          try { parsed = await res.json(); } catch (e) { parsed = null; }
-          if (parsed && parsed.detail && /no images found/i.test(String(parsed.detail))) {
-            // server explicitly reports no images — treat as empty gallery
-            setItems([]);
-            setLoading(false);
-            return;
-          }
-          const txt = await res.text().catch(() => null);
-          throw new Error((parsed && JSON.stringify(parsed)) || txt || res.statusText || `HTTP ${res.status}`);
-        }
-        const data = await res.json();
-        console.log('Gallery: response json', data);
-        const rawItems = data.images || data.data || [];
-        // normalize items to common shape
-        const items = (rawItems || []).map((it, idx) => {
-          const url = it.s3_path_gallery || it.s3_path || it.image_s3_url || it.image_url_s3 || it.image_url || it.url || it.path || it.image || it.signed_url || it.signedUrl || (it.attributes && (it.attributes.s3_path_gallery || it.attributes.url || it.attributes.path || it.attributes.image_s3_url || it.attributes.image_url_s3));
-          return {
-            id: it.id ?? it._id ?? `item-${idx}`,
-            mime_type: it.mime_type || it.content_type || (it.type || '').toString(),
-            s3_path_gallery: url || null,
-            image_s3_url: it.image_s3_url || it.image_s3_url || it.image_url_s3 || null,
-            image_url_s3: it.image_url_s3 || it.image_s3_url || it.image_url || null,
-            // keep original data for fallback
-            ...it,
-          };
-        });
-        setItems(items);
+  // fetchGallery is declared at component scope so we can trigger it from other effects (e.g. when auth state changes)
+  const lastTokenRef = useRef(null);
+  const fetchGallery = useCallback(async (force = false) => {
+    const CACHE_KEY = 'pronily:gallery:cache';
+    const CACHE_TTL = 1000 * 60 * 60 * 6; // 6 hours
+    console.log('Gallery: fetchGallery start (force=', !!force, ')');
+    setLoading(true);
+    setError(null);
+    try {
+      // Try cache first unless forced
+      if (!force) {
         try {
-          const payload = { items, expiresAt: Date.now() + CACHE_TTL };
-          localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+          const raw = localStorage.getItem(CACHE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.expiresAt && Number(parsed.expiresAt) > Date.now() && Array.isArray(parsed.items)) {
+              console.log('Gallery: using cached items', parsed.items.length);
+              setItems(parsed.items);
+              setLoading(false);
+              return;
+            }
+          }
         } catch (e) {
-          console.warn('Gallery: cache write failed', e);
+          console.warn('Gallery: cache read failed', e);
         }
-      } catch (e) {
-        setError(e.message || String(e));
-      } finally {
-        setLoading(false);
       }
-    };
-  // initial load: force a network fetch so gallery is populated when the page opens
-  fetchGallery(true);
+
+      const base = API_BASE;
+      console.log('Gallery: VITE_API_BASE_URL=', base);
+      if (!base) throw new Error('API base not configured');
+      const url = `${base.replace(/\/$/, '')}/characters/media/get-users-character-media`;
+      console.log('Gallery: fetch url=', url);
+      const headers = { 'Content-Type': 'application/json' };
+      const stored = localStorage.getItem('pronily:auth:token');
+      if (stored) {
+        const tokenOnly = stored.replace(/^bearer\s+/i, '').trim();
+        headers['Authorization'] = `bearer ${tokenOnly}`;
+      } else if (import.meta.env.VITE_API_AUTH_TOKEN) {
+        headers['Authorization'] = import.meta.env.VITE_API_AUTH_TOKEN;
+      }
+      const res = await fetch(url, { headers });
+      console.log('Gallery: fetch completed, status=', res.status);
+      if (!res.ok) {
+        // try to parse known JSON error shapes and treat "no images found" as empty
+        let parsed = null;
+        try { parsed = await res.json(); } catch (e) { parsed = null; }
+        // If backend explicitly says 'Not authenticated', redirect to signin preserving location
+        const authMsg = parsed && (parsed.detail || parsed.message || parsed.error) ? String(parsed.detail || parsed.message || parsed.error) : null;
+        if (authMsg && /not authenticated/i.test(authMsg)) {
+          navigate('/signin', { state: { background: location } });
+          return;
+        }
+        if (parsed && parsed.detail && /no images found/i.test(String(parsed.detail))) {
+          // server explicitly reports no images — treat as empty gallery
+          setItems([]);
+          setLoading(false);
+          return;
+        }
+        const txt = await res.text().catch(() => null);
+        throw new Error((parsed && JSON.stringify(parsed)) || txt || res.statusText || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
+      console.log('Gallery: response json', data);
+      const rawItems = data.images || data.data || [];
+      // normalize items to common shape
+      const items = (rawItems || []).map((it, idx) => {
+        const url = it.s3_path_gallery || it.s3_path || it.image_s3_url || it.image_url_s3 || it.image_url || it.url || it.path || it.image || it.signed_url || it.signedUrl || (it.attributes && (it.attributes.s3_path_gallery || it.attributes.url || it.attributes.path || it.attributes.image_s3_url || it.attributes.image_url_s3));
+        return {
+          id: it.id ?? it._id ?? `item-${idx}`,
+          mime_type: it.mime_type || it.content_type || (it.type || '').toString(),
+          s3_path_gallery: url || null,
+          image_s3_url: it.image_s3_url || it.image_s3_url || it.image_url_s3 || null,
+          image_url_s3: it.image_url_s3 || it.image_s3_url || it.image_url || null,
+          // keep original data for fallback
+          ...it,
+        };
+      });
+      setItems(items);
+      try {
+        const payload = { items, expiresAt: Date.now() + CACHE_TTL };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+      } catch (e) {
+        console.warn('Gallery: cache write failed', e);
+      }
+    } catch (e) {
+      const msg = String(e && (e.message || e) || '');
+      if (/not authenticated/i.test(msg)) {
+        navigate('/signin', { state: { background: location } });
+        return;
+      }
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE, navigate, location]);
+
+  useEffect(() => {
+    const onOpen = () => console.log('open:gallery event received');
+    window.addEventListener('open:gallery', onOpen);
+
+    // initial load: force a network fetch so gallery is populated when the page opens
+    fetchGallery(true);
+
     const onReload = () => { console.log('Gallery: gallery:reload received — refetching'); fetchGallery(true); };
     window.addEventListener('gallery:reload', onReload);
+
+    // detect cross-tab auth changes and same-tab changes (poll) so we can refetch when user returns from signin
+    function onStorage(e) {
+      if (e.key === 'pronily:auth:token') {
+        const newVal = e.newValue;
+        if (newVal) fetchGallery(true);
+      }
+    }
+    window.addEventListener('storage', onStorage);
+
+    lastTokenRef.current = (() => {
+      try { return localStorage.getItem('pronily:auth:token'); } catch { return null; }
+    })();
+
+    const pollInterval = setInterval(() => {
+      try {
+        const cur = localStorage.getItem('pronily:auth:token');
+        if (cur !== lastTokenRef.current) {
+          // token changed in same tab (signin flow returned here)
+          if (cur) fetchGallery(true);
+          lastTokenRef.current = cur;
+        }
+      } catch (e) {}
+    }, 1000);
+
     return () => {
       window.removeEventListener('gallery:reload', onReload);
       window.removeEventListener('open:gallery', onOpen);
+      window.removeEventListener('storage', onStorage);
+      clearInterval(pollInterval);
     };
-  }, []);
+  }, [fetchGallery]);
 
   return (
     <section className="w-full max-w-7xl mx-auto rounded-2xl border border-white/10 bg-white/[.03] p-6 sm:p-8">
@@ -363,13 +414,24 @@ export default function Gallery() {
       ) : error ? (
         <div className="text-center text-red-400">{error}</div>
       ) : items.length === 0 ? (
-        <div className="text-center text-white/70 space-y-3">
-          <div className="text-lg font-medium">You have not created any Images or Videos.</div>
-          <div className="text-sm text-white/60">Use the AI Porn Generator to create your own character images and videos.</div>
-          <div className="mt-3">
-            <button onClick={() => navigate('/ai-porn/image')} className="rounded-xl px-4 py-2 font-semibold text-white bg-gradient-to-r from-pink-500 via-pink-400 to-indigo-500">Use AI Porn Generator</button>
+        // if user isn't logged in show a sign-in prompt; otherwise show the existing 'no items' message
+        !isLoggedIn ? (
+          <div className="text-center text-white/70 space-y-3">
+            <div className="text-lg font-medium">You are not logged in.</div>
+            <div className="text-sm text-white/60">Sign in to view your Character Images and Videos.</div>
+            <div className="mt-3">
+              <button onClick={() => navigate('/signin', { state: { background: location } })} className="rounded-xl px-4 py-2 font-semibold text-white bg-gradient-to-r from-pink-500 via-pink-400 to-indigo-500">Sign in</button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="text-center text-white/70 space-y-3">
+            <div className="text-lg font-medium">You have not created any Images or Videos.</div>
+            <div className="text-sm text-white/60">Use the AI Porn Generator to create your own character images and videos.</div>
+            <div className="mt-3">
+              <button onClick={() => navigate('/ai-porn/image')} className="rounded-xl px-4 py-2 font-semibold text-white bg-gradient-to-r from-pink-500 via-pink-400 to-indigo-500">Use AI Porn Generator</button>
+            </div>
+          </div>
+        )
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {items.map((it) => {
