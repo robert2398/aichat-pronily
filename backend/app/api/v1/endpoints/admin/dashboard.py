@@ -1,994 +1,531 @@
-from fastapi import APIRouter, Depends, Query, HTTPException
+from typing import Optional, List
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import func, and_, or_, case, distinct
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta, date
-from collections import defaultdict
+from sqlalchemy import func, select, cast, Date, text
 
 from app.api.v1.deps import get_db, require_admin
+from app.models.subscription import (
+    CoinTransaction, CoinPurchase, Subscription, Order, PromoManagement
+)
 from app.models.user import User
-from app.models.subscription import Subscription, PricingPlan
-from app.models.chat import ChatMessage
-from app.models.character import Character  #, GenderEnum
-from app.models.usage_metrics import UsageMetrics
+from app.models.character import Character
 
 router = APIRouter()
 
-# Helper function to parse date range
-def parse_date_range(date_range: str) -> tuple[datetime, datetime]:
-    """Parse date range string into start and end dates"""
-    now = datetime.now()
-    
-    if date_range == "7d":
-        start_date = now - timedelta(days=7)
-    elif date_range == "30d":
-        start_date = now - timedelta(days=30)
-    elif date_range == "90d":
-        start_date = now - timedelta(days=90)
-    elif date_range == "1y":
-        start_date = now - timedelta(days=365)
-    else:
-        start_date = now - timedelta(days=30)  # default to 30 days
-    
-    return start_date, now
 
-def parse_date_params(date_range: Optional[str] = None, from_date: Optional[str] = None, to_date: Optional[str] = None) -> tuple[datetime, datetime]:
-    """Parse date parameters - supports both date_range and from/to parameters"""
-    if from_date and to_date:
-        try:
-            start_date = datetime.fromisoformat(from_date.replace('Z', '+00:00'))
-            end_date = datetime.fromisoformat(to_date.replace('Z', '+00:00'))
-            return start_date, end_date
-        except ValueError:
-            pass
-    
-    # Fallback to date_range parsing
-    return parse_date_range(date_range or "30d")
+def _date_range_defaults(start_date: Optional[str], end_date: Optional[str]):
+    # pass-through; router endpoints handle optional strings and SQL filters
+    return start_date, end_date
 
-# KPIs endpoint
-@router.get("/analytics/kpis", dependencies=[Depends(require_admin)])
-async def get_kpis(
-    date_range: Optional[str] = Query(None, description="Date range: 7d, 30d, 90d, 1y"),
-    from_date: Optional[str] = Query(None, alias="from", description="Start date (ISO format)"),
-    to_date: Optional[str] = Query(None, alias="to", description="End date (ISO format)"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get key performance indicators"""
-    start_date, end_date = parse_date_params(date_range, from_date, to_date)
-    
-    # Active users (users with messages in the date range)
-    active_users_result = await db.execute(
-        select(func.count(distinct(ChatMessage.user_id)))
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-    )
-    active_users = active_users_result.scalar() or 0
-    
-    # New users (registered in the date range)
-    new_users_result = await db.execute(
-        select(func.count(User.id))
-        .where(User.created_at >= start_date)
-        .where(User.created_at <= end_date)
-    )
-    new_users = new_users_result.scalar() or 0
-    
-    # MRR calculation
-    active_subs_result = await db.execute(
-        select(func.sum(PricingPlan.price))
-        .join(Subscription, PricingPlan.plan_name == Subscription.plan_name)
-        .where(Subscription.status == 'active')
-        .where(or_(
-            PricingPlan.billing_cycle == 'monthly',
-            PricingPlan.billing_cycle == 'yearly'
-        ))
-    )
-    total_revenue = active_subs_result.scalar() or 0
-    
-    # Convert yearly to monthly for MRR
-    yearly_subs_result = await db.execute(
-        select(func.sum(PricingPlan.price))
-        .join(Subscription, PricingPlan.plan_name == Subscription.plan_name)
-        .where(Subscription.status == 'active')
-        .where(PricingPlan.billing_cycle == 'yearly')
-    )
-    yearly_revenue = yearly_subs_result.scalar() or 0
-    mrr = total_revenue - yearly_revenue + (yearly_revenue / 12) if yearly_revenue else total_revenue
-    
-    # Churn rate (cancelled subscriptions in period)
-    total_subs_result = await db.execute(select(func.count(Subscription.id)).where(Subscription.status == 'active'))
-    total_subs = total_subs_result.scalar() or 0
-    
-    churned_subs_result = await db.execute(
-        select(func.count(Subscription.id))
-        .where(Subscription.status == 'canceled')
-        .where(Subscription.updated_at >= start_date)
-        .where(Subscription.updated_at <= end_date)
-    )
-    churned_subs = churned_subs_result.scalar() or 0
-    churn_rate_pct = (churned_subs / total_subs * 100) if total_subs > 0 else 0
-    
-    # Average messages per session
-    total_messages_result = await db.execute(
-        select(func.count(ChatMessage.id))
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-    )
-    total_messages = total_messages_result.scalar() or 0
-    
-    total_sessions_result = await db.execute(
-        select(func.count(distinct(ChatMessage.session_id)))
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-    )
-    total_sessions = total_sessions_result.scalar() or 0
-    avg_messages_per_session = total_messages / total_sessions if total_sessions > 0 else 0
-    
-    return {
-        "activeUsers": active_users,
-        "newUsers": new_users,
-        "mrr": float(mrr) if mrr else 0.0,
-        "churnRatePct": float(churn_rate_pct),
-        "avgMessagesPerSession": float(avg_messages_per_session)
+
+@router.get("/api/monetization/coins/purchases-summary", dependencies=[Depends(require_admin)])
+async def coins_purchases_summary(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    interval: Optional[str] = Query(None),  # daily, weekly, monthly
+    db: AsyncSession = Depends(get_db),
+):
+    """Aggregated coin purchase data."""
+    # overall totals from coin_purchases table
+    start_date, end_date = _date_range_defaults(start_date, end_date)
+
+    q = select(func.count(CoinPurchase.id).label("total_purchase_transactions"), func.coalesce(func.sum(CoinPurchase.coin_reward), 0).label("total_coins_purchased"))
+    if start_date:
+        q = q.where(CoinPurchase.created_at >= start_date)
+    if end_date:
+        q = q.where(CoinPurchase.created_at <= end_date)
+
+    result = await db.execute(q)
+    totals = result.first() or (0, 0)
+
+    response = {
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_purchase_transactions": int(totals[0] or 0),
+        "total_coins_purchased": int(totals[1] or 0),
     }
 
-# Users series endpoint
-@router.get("/users/timeseries", dependencies=[Depends(require_admin)])
-async def get_users_series(
-    date_range: Optional[str] = Query(None, description="Date range: 7d, 30d, 90d, 1y"),
-    from_date: Optional[str] = Query(None, alias="from", description="Start date (ISO format)"),
-    to_date: Optional[str] = Query(None, alias="to", description="End date (ISO format)"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get users time series data"""
-    start_date, end_date = parse_date_params(date_range, from_date, to_date)
-    
-    # Get daily new users
-    new_users_result = await db.execute(
-        select(
-            func.date(User.created_at).label('date'),
-            func.count(User.id).label('newUsers')
-        )
-        .where(User.created_at >= start_date)
-        .where(User.created_at <= end_date)
-        .group_by(func.date(User.created_at))
-        .order_by(func.date(User.created_at))
-    )
-    
-    # Get daily active users
-    active_users_result = await db.execute(
-        select(
-            func.date(ChatMessage.created_at).label('date'),
-            func.count(distinct(ChatMessage.user_id)).label('activeUsers')
-        )
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-        .group_by(func.date(ChatMessage.created_at))
-        .order_by(func.date(ChatMessage.created_at))
-    )
-    
-    new_users_data = {str(row.date): row.newUsers for row in new_users_result.fetchall()}
-    active_users_data = {str(row.date): row.activeUsers for row in active_users_result.fetchall()}
-    
-    # Combine data for all dates in range
-    series = []
-    current_date = start_date.date()
-    end_date_only = end_date.date()
-    
-    while current_date <= end_date_only:
-        date_str = str(current_date)
-        series.append({
-            "date": date_str,
-            "newUsers": new_users_data.get(date_str, 0),
-            "activeUsers": active_users_data.get(date_str, 0)
+    if interval:
+        # simple daily/monthly bucketing using DATE(created_at) or strftime fallback
+        if interval == "daily":
+            period_expr = cast(func.date(CoinPurchase.created_at), Date)
+            label = func.to_char(CoinPurchase.created_at, 'YYYY-MM-DD')
+        elif interval == "monthly":
+            label = func.to_char(CoinPurchase.created_at, 'YYYY-MM')
+        else:
+            label = func.to_char(CoinPurchase.created_at, 'IYYY-"W"IW')
+
+        breakdown_q = select(label.label("date"), func.coalesce(func.sum(CoinPurchase.coin_reward), 0).label("coins_purchased"))
+        if start_date:
+            breakdown_q = breakdown_q.where(CoinPurchase.created_at >= start_date)
+        if end_date:
+            breakdown_q = breakdown_q.where(CoinPurchase.created_at <= end_date)
+        breakdown_q = breakdown_q.group_by(label).order_by(label)
+
+        rows = await db.execute(breakdown_q)
+        breakdown = [{"date": r[0], "coins_purchased": int(r[1])} for r in rows]
+        response["breakdown"] = breakdown
+
+    return response
+
+
+@router.get("/api/monetization/coins/usage-by-feature", dependencies=[Depends(require_admin)])
+async def coins_usage_by_feature(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    feature: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Coins spent by feature."""
+    q = select(func.coalesce(func.sum(CoinTransaction.coins), 0)).label("total")
+    # base total
+    total_q = select(func.coalesce(func.sum(CoinTransaction.coins), 0).label("total_coins_spent"))
+    if start_date:
+        total_q = total_q.where(CoinTransaction.created_at >= start_date)
+    if end_date:
+        total_q = total_q.where(CoinTransaction.created_at <= end_date)
+    if feature:
+        total_q = total_q.where(CoinTransaction.source_type == feature)
+
+    total_row = await db.execute(total_q)
+    total_coins = int((total_row.scalar()) or 0)
+
+    by_feature_q = select(CoinTransaction.source_type.label("feature"), func.coalesce(func.sum(CoinTransaction.coins), 0).label("coins_spent"))
+    if start_date:
+        by_feature_q = by_feature_q.where(CoinTransaction.created_at >= start_date)
+    if end_date:
+        by_feature_q = by_feature_q.where(CoinTransaction.created_at <= end_date)
+    if feature:
+        by_feature_q = by_feature_q.where(CoinTransaction.source_type == feature)
+    by_feature_q = by_feature_q.group_by(CoinTransaction.source_type).order_by(func.sum(CoinTransaction.coins).desc())
+
+    rows = await db.execute(by_feature_q)
+    features = []
+    for feat, coins in rows:
+        coins_i = int(coins or 0)
+        pct = round((coins_i / total_coins * 100), 2) if total_coins > 0 else 0.0
+        features.append({"feature": feat, "coins_spent": coins_i, "percentage": pct})
+
+    return {"start_date": start_date, "end_date": end_date, "total_coins_spent": total_coins, "by_feature": features}
+
+
+@router.get("/api/monetization/subscriptions/plan-summary", dependencies=[Depends(require_admin)])
+async def subscriptions_plan_summary(
+    as_of_date: Optional[str] = Query(None),
+    include_inactive: Optional[bool] = Query(False),
+    db: AsyncSession = Depends(get_db),
+):
+    """Subscription counts and simple retention/churn snapshot by plan."""
+    q = select(Subscription.plan_name, func.count(Subscription.id).label("active_subscribers"))
+    if not include_inactive:
+        q = q.where(Subscription.status == 'active')
+    if as_of_date:
+        # naive filter: subscriptions created before or equal to as_of_date
+        q = q.where(Subscription.start_date <= as_of_date)
+
+    q = q.group_by(Subscription.plan_name)
+    rows = await db.execute(q)
+    plans = []
+    total_active = 0
+    for plan_name, active_count in rows:
+        plans.append({
+            "plan_name": plan_name,
+            "monthly_price": None,
+            "active_subscribers": int(active_count or 0),
+            "retention_rate": None,
+            "churn_rate": None,
+            "avg_subscription_duration": None,
         })
-        current_date += timedelta(days=1)
-    
-    return {"series": series}
+        total_active += int(active_count or 0)
 
-# Messages series endpoint
-@router.get("/engagement/messages-timeseries", dependencies=[Depends(require_admin)])
-async def get_messages_series(
-    date_range: Optional[str] = Query(None, description="Date range: 7d, 30d, 90d, 1y"),
-    from_date: Optional[str] = Query(None, alias="from", description="Start date (ISO format)"),
-    to_date: Optional[str] = Query(None, alias="to", description="End date (ISO format)"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get messages time series data"""
-    start_date, end_date = parse_date_params(date_range, from_date, to_date)
-    
-    result = await db.execute(
-        select(
-            func.date(ChatMessage.created_at).label('date'),
-            func.count(ChatMessage.id).label('messages')
-        )
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-        .group_by(func.date(ChatMessage.created_at))
-        .order_by(func.date(ChatMessage.created_at))
-    )
-    
-    data = {str(row.date): row.messages for row in result.fetchall()}
-    
-    # Fill in missing dates with 0
-    series = []
-    current_date = start_date.date()
-    end_date_only = end_date.date()
-    
-    while current_date <= end_date_only:
-        date_str = str(current_date)
-        series.append({
-            "date": date_str,
-            "messages": data.get(date_str, 0)
-        })
-        current_date += timedelta(days=1)
-    
-    return {"series": series}
+    highest_retention_plan = None
+    if plans:
+        highest_retention_plan = plans[0]["plan_name"]
 
-# Subscriptions overview endpoint
-@router.get("/subscriptions/overview", dependencies=[Depends(require_admin)])
-async def get_subscriptions_overview(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get subscriptions overview"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # Active subscriptions
-    active_result = await db.execute(
-        select(func.count(Subscription.id))
-        .where(Subscription.status == 'active')
-    )
-    active = active_result.scalar() or 0
-    
-    # New subscriptions in range
-    new_in_range_result = await db.execute(
-        select(func.count(Subscription.id))
-        .where(Subscription.created_at >= start_date)
-        .where(Subscription.created_at <= end_date)
-    )
-    new_in_range = new_in_range_result.scalar() or 0
-    
-    # Churned subscriptions in range
-    churned_in_range_result = await db.execute(
-        select(func.count(Subscription.id))
-        .where(Subscription.status == 'canceled')
-        .where(Subscription.updated_at >= start_date)
-        .where(Subscription.updated_at <= end_date)
-    )
-    churned_in_range = churned_in_range_result.scalar() or 0
-    
-    # Plan distribution
-    plan_dist_result = await db.execute(
-        select(
-            Subscription.plan_name,
-            func.count(Subscription.id).label('count')
-        )
-        .where(Subscription.status == 'active')
-        .group_by(Subscription.plan_name)
-    )
-    plan_distribution = [{"plan_name": row.plan_name or "unknown", "count": row.count} for row in plan_dist_result.fetchall()]
-    
-    # MRR and ARR calculation
-    mrr_result = await db.execute(
-        select(func.sum(PricingPlan.price))
-        .join(Subscription, PricingPlan.plan_name == Subscription.plan_name)
-        .where(Subscription.status == 'active')
-        .where(PricingPlan.billing_cycle == 'monthly')
-    )
-    monthly_revenue = mrr_result.scalar() or 0
-    
-    arr_result = await db.execute(
-        select(func.sum(PricingPlan.price))
-        .join(Subscription, PricingPlan.plan_name == Subscription.plan_name)
-        .where(Subscription.status == 'active')
-        .where(PricingPlan.billing_cycle == 'yearly')
-    )
-    yearly_revenue = arr_result.scalar() or 0
-    
-    mrr = float(monthly_revenue + (yearly_revenue / 12))
-    arr = float(yearly_revenue + (monthly_revenue * 12))
-    
-    return {
-        "active": active,
-        "newInRange": new_in_range,
-        "churnedInRange": churned_in_range,
-        "planDistribution": plan_distribution,
-        "mrr": mrr,
-        "arr": arr
-    }
+    return {"as_of_date": as_of_date, "total_active_subscribers": total_active, "plans": plans, "highest_retention_plan": highest_retention_plan}
 
-# Subscriptions series endpoint
-@router.get("/subscriptions/timeseries", dependencies=[Depends(require_admin)])
-async def get_subscriptions_series(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get subscriptions time series data"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # New subscriptions by date
-    new_subs_result = await db.execute(
-        select(
-            func.date(Subscription.created_at).label('date'),
-            func.count(Subscription.id).label('new')
-        )
-        .where(Subscription.created_at >= start_date)
-        .where(Subscription.created_at <= end_date)
-        .group_by(func.date(Subscription.created_at))
-        .order_by(func.date(Subscription.created_at))
-    )
-    
-    # Churned subscriptions by date
-    churned_subs_result = await db.execute(
-        select(
-            func.date(Subscription.updated_at).label('date'),
-            func.count(Subscription.id).label('churned')
-        )
-        .where(Subscription.status == 'canceled')
-        .where(Subscription.updated_at >= start_date)
-        .where(Subscription.updated_at <= end_date)
-        .group_by(func.date(Subscription.updated_at))
-        .order_by(func.date(Subscription.updated_at))
-    )
-    
-    new_data = {str(row.date): row.new for row in new_subs_result.fetchall()}
-    churned_data = {str(row.date): row.churned for row in churned_subs_result.fetchall()}
-    
-    # Fill in missing dates
-    series = []
-    current_date = start_date.date()
-    end_date_only = end_date.date()
-    
-    while current_date <= end_date_only:
-        date_str = str(current_date)
-        series.append({
-            "date": date_str,
-            "new": new_data.get(date_str, 0),
-            "churned": churned_data.get(date_str, 0)
-        })
-        current_date += timedelta(days=1)
-    
-    return {"series": series}
 
-# Revenue series endpoint
-@router.get("/revenue/timeseries", dependencies=[Depends(require_admin)])
-async def get_revenue_series(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get revenue time series data"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # For simplicity, we'll calculate MRR based on active subscriptions at each point in time
-    # In practice, you'd want more sophisticated revenue tracking
-    result = await db.execute(
-        select(
-            func.date(Subscription.created_at).label('date'),
-            func.sum(PricingPlan.price).label('revenue')
-        )
-        .join(PricingPlan, PricingPlan.plan_name == Subscription.plan_name)
-        .where(Subscription.created_at >= start_date)
-        .where(Subscription.created_at <= end_date)
-        .where(Subscription.status == 'active')
-        .group_by(func.date(Subscription.created_at))
-        .order_by(func.date(Subscription.created_at))
-    )
-    
-    data = {str(row.date): float(row.revenue or 0) for row in result.fetchall()}
-    
-    # Fill in missing dates
-    series = []
-    current_date = start_date.date()
-    end_date_only = end_date.date()
-    
-    while current_date <= end_date_only:
-        date_str = str(current_date)
-        series.append({
-            "date": date_str,
-            "mrr": data.get(date_str, 0.0)
-        })
-        current_date += timedelta(days=1)
-    
-    return {"series": series}
+@router.get("/api/monetization/subscriptions/history", dependencies=[Depends(require_admin)])
+async def subscriptions_history(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    metric: Optional[str] = Query('active_count'),  # active_count, new_subscriptions, cancellations
+    interval: Optional[str] = Query('monthly'),
+    db: AsyncSession = Depends(get_db),
+):
+    """Historical subscription metrics over time."""
+    # For simplicity implement monthly active_count and new_subscriptions
+    if interval != 'monthly':
+        # fallback to monthly for now
+        interval = 'monthly'
 
-# Session length endpoint
-@router.get("/engagement/session-length", dependencies=[Depends(require_admin)])
-async def get_session_length(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get session length statistics"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # Get session durations (simplified - based on message count per session)
-    result = await db.execute(
-        select(
-            ChatMessage.session_id,
-            func.count(ChatMessage.id).label('message_count'),
-            func.max(ChatMessage.created_at).label('end_time'),
-            func.min(ChatMessage.created_at).label('start_time')
+    if metric == 'active_count':
+        # Count subscriptions active at end of each month in period using a generate_series helper (Postgres)
+        sql = text(
+            '''
+            SELECT to_char(date_trunc('month', months.generated_month), 'YYYY-MM') AS period,
+                   count(s.*) AS value
+            FROM (
+                SELECT generate_series(:start_date::date, :end_date::date, interval '1 month') AS generated_month
+            ) months
+            LEFT JOIN subscriptions s
+              ON date_trunc('month', s.start_date) <= months.generated_month
+             AND (s.current_period_end IS NULL OR s.current_period_end >= months.generated_month)
+            GROUP BY period
+            ORDER BY period
+            '''
         )
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-        .group_by(ChatMessage.session_id)
-    )
-    
-    durations = []
-    for row in result.fetchall():
-        if row.end_time and row.start_time:
-            duration_minutes = (row.end_time - row.start_time).total_seconds() / 60
-            durations.append(duration_minutes)
-    
-    if not durations:
-        return {"avg": 0.0, "p50": 0.0, "p90": 0.0}
-    
-    durations.sort()
-    avg = sum(durations) / len(durations)
-    p50 = durations[int(len(durations) * 0.5)]
-    p90 = durations[int(len(durations) * 0.9)]
-    
-    return {
-        "avg": float(avg),
-        "p50": float(p50),
-        "p90": float(p90)
-    }
+        params = {"start_date": start_date or '2024-01-01', "end_date": end_date or '2025-12-01'}
+        rows = await db.execute(sql, params)
+        history = [{"period": r[0], "value": int(r[1])} for r in rows]
+        return {"metric": metric, "interval": interval, "history": history}
 
-# Role ratio endpoint
-@router.get("/engagement/role-ratio", dependencies=[Depends(require_admin)])
-async def get_role_ratio(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get message role distribution"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    result = await db.execute(
-        select(
-            ChatMessage.role,
-            func.count(ChatMessage.id).label('count')
-        )
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-        .group_by(ChatMessage.role)
-    )
-    
-    role_counts = {row.role: row.count for row in result.fetchall()}
-    total = sum(role_counts.values())
-    
-    if total == 0:
-        return {"user": 0, "assistant": 0}
-    
-    return {
-        "user": role_counts.get("user", 0),
-        "assistant": role_counts.get("assistant", 0)
-    }
+    # other metrics not implemented fully, return empty
+    return {"metric": metric, "interval": interval, "history": []}
 
-# Characters summary endpoint
-@router.get("/characters/summary", dependencies=[Depends(require_admin)])
-async def get_characters_summary(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get characters usage summary"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # Total characters used
-    total_chars_result = await db.execute(
-        select(func.count(distinct(ChatMessage.character_id)))
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-    )
-    total_characters = total_chars_result.scalar() or 0
-    
-    # Average characters per user
-    users_with_chars_result = await db.execute(
-        select(func.count(distinct(ChatMessage.user_id)))
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-    )
-    users_with_chars = users_with_chars_result.scalar() or 1
-    avg_per_user = total_characters / users_with_chars if users_with_chars > 0 else 0
-    
-    # By gender
-    gender_result = await db.execute(
-        select(
-            Character.gender,
-            func.count(distinct(ChatMessage.character_id)).label('count')
-        )
-        .join(ChatMessage, Character.id == ChatMessage.character_id)
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-        .group_by(Character.gender)
-    )
-    by_gender = [{"gender": str(row.gender), "count": row.count} for row in gender_result.fetchall()]
-    
-    # Top styles
-    styles_result = await db.execute(
-        select(
-            Character.style,
-            func.count(distinct(ChatMessage.character_id)).label('count')
-        )
-        .join(ChatMessage, Character.id == ChatMessage.character_id)
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-        .where(Character.style.isnot(None))
-        .group_by(Character.style)
-        .order_by(func.count(distinct(ChatMessage.character_id)).desc())
-        .limit(10)
-    )
-    top_styles = [{"style": row.style or "unknown", "count": row.count} for row in styles_result.fetchall()]
-    
-    # By country - column removed from Character; return empty list to preserve response shape
-    by_country = []
-    
-    return {
-        "totalCharacters": total_characters,
-        "avgPerUser": float(avg_per_user),
-        "byGender": by_gender,
-        "topStyles": top_styles,
-        "byCountry": by_country
-    }
 
-# Media usage endpoint
-@router.get("/media/usage", dependencies=[Depends(require_admin)])
-async def get_media_usage(
-    date_range: Optional[str] = Query(None, description="Date range: 7d, 30d, 90d, 1y"),
-    from_date: Optional[str] = Query(None, alias="from", description="Start date (ISO format)"),
-    to_date: Optional[str] = Query(None, alias="to", description="End date (ISO format)"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get media usage statistics"""
-    start_date, end_date = parse_date_params(date_range, from_date, to_date)
-    
-    # Character images (characters with image_url_s3 set)
-    char_images_result = await db.execute(
-        select(func.count(distinct(Character.id)))
-        .where(Character.image_url_s3.isnot(None))
-        .where(Character.created_at >= start_date)
-        .where(Character.created_at <= end_date)
-    )
-    character_images = char_images_result.scalar() or 0
-    
-    # Voice messages
-    voice_input_result = await db.execute(
-        select(func.count(ChatMessage.id))
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-        .where(ChatMessage.audio_url_user.isnot(None))
-    )
-    voice_input_count = voice_input_result.scalar() or 0
-    
-    voice_output_result = await db.execute(
-        select(func.count(ChatMessage.id))
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-        .where(ChatMessage.audio_url_output.isnot(None))
-    )
-    voice_output_count = voice_output_result.scalar() or 0
-    
-    total_messages_result = await db.execute(
-        select(func.count(ChatMessage.id))
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-    )
-    total_messages = total_messages_result.scalar() or 0
-    
-    voice_pct = ((voice_input_count + voice_output_count) / total_messages * 100) if total_messages > 0 else 0
-    
-    return {
-        "characterImages": character_images,
-        "voice": {
-            "inputCount": voice_input_count,
-            "outputCount": voice_output_count,
-            "pctOfMessages": float(voice_pct)
+@router.get("/api/monetization/users/lifetime-value", dependencies=[Depends(require_admin)])
+async def users_lifetime_value(
+    user_id: Optional[int] = Query(None),
+    detailed: Optional[bool] = Query(False),
+    db: AsyncSession = Depends(get_db),
+):
+    """Compute simple lifetime value (sum of orders.price + coin purchases price)"""
+    if user_id:
+        # sum orders subtotal and coin_purchases price for the user
+        orders_q = select(func.coalesce(func.sum(Order.subtotal_at_apply), 0)).where(Order.user_id == user_id)
+        coin_q = select(func.coalesce(func.sum(CoinPurchase.price), 0)).where(CoinPurchase.id == CoinPurchase.id)
+        orders_sum = await db.execute(orders_q)
+        total_orders = float(orders_sum.scalar() or 0.0)
+        # coin purchases not linked to user in this schema; approximate by querying orders that are coin purchases via discount_type or similar
+        # fallback: 0 for coin purchase value by user
+        total_coins_val = 0.0
+
+        coins_acquired_q = select(func.coalesce(func.sum(CoinTransaction.coins), 0)).where(CoinTransaction.user_id == user_id)
+        coins_spent_q = select(func.coalesce(func.sum(CoinTransaction.coins), 0)).where(CoinTransaction.user_id == user_id, CoinTransaction.transaction_type == 'debit')
+        acquired = await db.execute(coins_acquired_q)
+        spent = await db.execute(coins_spent_q)
+        total_coins_acquired = int(acquired.scalar() or 0)
+        total_coins_spent = int(spent.scalar() or 0)
+
+        resp = {
+            "user_id": user_id,
+            "total_revenue": round(total_orders + total_coins_val, 2),
+            "coins_purchase_value": round(total_coins_val, 2),
+            "subscription_value": round(total_orders, 2),
+            "total_coins_acquired": total_coins_acquired,
+            "total_coins_spent": total_coins_spent,
+            "lifetime_duration_months": None,
         }
-    }
+        if detailed:
+            resp["details"] = {}
+        return resp
 
-# Funnel endpoint
-@router.get("/conversions/funnel", dependencies=[Depends(require_admin)])
-async def get_funnel(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get conversion funnel data"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # Registered users
-    registered_result = await db.execute(
-        select(func.count(User.id))
-        .where(User.created_at >= start_date)
-        .where(User.created_at <= end_date)
-    )
-    registered = registered_result.scalar() or 0
-    
-    # Verified users
-    verified_result = await db.execute(
-        select(func.count(User.id))
-        .where(User.created_at >= start_date)
-        .where(User.created_at <= end_date)
-        .where(User.is_email_verified == True)
-    )
-    verified = verified_result.scalar() or 0
-    
-    # Subscribed users
-    subscribed_result = await db.execute(
-        select(func.count(distinct(Subscription.user_id)))
-        .where(Subscription.created_at >= start_date)
-        .where(Subscription.created_at <= end_date)
-    )
-    subscribed = subscribed_result.scalar() or 0
-    
-    return {
-        "registered": registered,
-        "verified": verified,
-        "subscribed": subscribed
-    }
+    # aggregate / average LTV across users
+    total_rev_q = select(func.coalesce(func.sum(Order.subtotal_at_apply), 0))
+    total_users_q = select(func.count(User.id))
+    total_rev = float((await db.execute(total_rev_q)).scalar() or 0.0)
+    total_users = int((await db.execute(total_users_q)).scalar() or 0)
+    avg_ltv = round(total_rev / total_users, 2) if total_users > 0 else 0.0
 
-# Retention cohorts endpoint
-@router.get("/users/retention-cohorts", dependencies=[Depends(require_admin)])
-async def get_retention_cohorts(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get user retention cohorts (simplified)"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # Simplified cohort analysis - group by week
-    result = await db.execute(
-        select(
-            func.date_trunc('week', User.created_at).label('cohort'),
-            func.count(User.id).label('size')
-        )
-        .where(User.created_at >= start_date)
-        .where(User.created_at <= end_date)
-        .group_by(func.date_trunc('week', User.created_at))
-        .order_by(func.date_trunc('week', User.created_at))
-    )
-    
-    cohorts = []
-    for row in result.fetchall():
-        # Simplified retention calculation (would need more complex logic in production)
-        cohorts.append({
-            "cohort": str(row.cohort.date()) if row.cohort else "",
-            "size": row.size,
-            "d7_retainedPct": 85.0,  # Mock data - would need actual retention calculation
-            "d14_retainedPct": 70.0  # Mock data - would need actual retention calculation
+    return {"average_ltv": avg_ltv, "total_revenue_all_users": round(total_rev, 2), "total_users": total_users}
+
+
+@router.get("/api/monetization/revenue/trends", dependencies=[Depends(require_admin)])
+async def revenue_trends(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    interval: Optional[str] = Query('monthly'),
+    segment: Optional[str] = Query('all'),  # all, subscription, coins
+    db: AsyncSession = Depends(get_db),
+):
+    """Revenue trends combining orders (subscription) and coin purchases."""
+    # monthly aggregation from orders and coin_purchases
+    # subscription revenue from orders.subtotal_at_apply when subscription_id is not null
+    sub_q = select(func.to_char(Order.applied_at, 'YYYY-MM').label('period'), func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('subscription_revenue')).where(Order.subscription_id != None)
+    coin_q = select(func.to_char(Order.applied_at, 'YYYY-MM').label('period'), func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('coin_revenue')).where(Order.subscription_id == None)
+
+    if start_date:
+        sub_q = sub_q.where(Order.applied_at >= start_date)
+        coin_q = coin_q.where(Order.applied_at >= start_date)
+    if end_date:
+        sub_q = sub_q.where(Order.applied_at <= end_date)
+        coin_q = coin_q.where(Order.applied_at <= end_date)
+
+    sub_q = sub_q.group_by(text('period')).order_by(text('period'))
+    coin_q = coin_q.group_by(text('period')).order_by(text('period'))
+
+    sub_rows = await db.execute(sub_q)
+    coin_rows = await db.execute(coin_q)
+
+    sub_map = {r[0]: float(r[1] or 0.0) for r in sub_rows}
+    coin_map = {r[0]: float(r[1] or 0.0) for r in coin_rows}
+
+    periods = sorted(set(list(sub_map.keys()) + list(coin_map.keys())))
+    trends = []
+    total = 0.0
+    for p in periods:
+        s = sub_map.get(p, 0.0)
+        c = coin_map.get(p, 0.0)
+        t = round(s + c, 2)
+        trends.append({"period": p, "subscription_revenue": round(s, 2), "coin_revenue": round(c, 2), "total_revenue": t})
+        total += t
+
+    avg_monthly = round(total / len(periods), 2) if periods else 0.0
+    return {"currency": "USD", "interval": interval, "revenue_trends": trends, "total_revenue_all_periods": round(total, 2), "avg_monthly_revenue": avg_monthly}
+
+
+@router.get("/api/monetization/coins/trends", dependencies=[Depends(require_admin)])
+async def coins_trends(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    interval: Optional[str] = Query('weekly'),
+    cohort: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Coins purchased vs spent over time (simple weekly/monthly grouping)."""
+    # use coin_transactions table for spent and purchases (transaction_type)
+    period_label = func.to_char(CoinTransaction.created_at, 'IYYY-"W"IW') if interval == 'weekly' else func.to_char(CoinTransaction.created_at, 'YYYY-MM')
+    q = select(period_label.label('period'), func.coalesce(func.sum(func.case([(CoinTransaction.transaction_type == 'credit', CoinTransaction.coins)], else_=0)), 0).label('coins_purchased'), func.coalesce(func.sum(func.case([(CoinTransaction.transaction_type == 'debit', CoinTransaction.coins)], else_=0)), 0).label('coins_spent'))
+    if start_date:
+        q = q.where(CoinTransaction.created_at >= start_date)
+    if end_date:
+        q = q.where(CoinTransaction.created_at <= end_date)
+    if cohort:
+        # no cohort mapping supported in schema; ignore
+        pass
+    q = q.group_by('period').order_by('period')
+    rows = await db.execute(q)
+    trends = []
+    total_purchased = 0
+    total_spent = 0
+    for p, purchased, spent in rows:
+        purchased_i = int(purchased or 0)
+        spent_i = int(spent or 0)
+        trends.append({"period": p, "coins_purchased": purchased_i, "coins_spent": spent_i})
+        total_purchased += purchased_i
+        total_spent += spent_i
+
+    net = total_purchased - total_spent
+    ratio = round((total_purchased / total_spent), 2) if total_spent > 0 else None
+
+    return {"interval": interval, "coin_trends": trends, "net_coins_change": net, "purchase_to_spend_ratio": ratio}
+
+
+@router.get("/api/monetization/users/top-spenders", dependencies=[Depends(require_admin)])
+async def users_top_spenders(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    limit: int = Query(10),
+    metric: str = Query('revenue'),
+    plan: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Top spending users by revenue or coins."""
+    # For revenue, sum orders.subtotal_at_apply per user; for coins, sum coin transactions debit coins
+    if metric == 'coins':
+        q = select(CoinTransaction.user_id.label('user_id'), func.coalesce(func.sum(CoinTransaction.coins), 0).label('coins_spent')).where(CoinTransaction.transaction_type == 'debit')
+        if start_date:
+            q = q.where(CoinTransaction.created_at >= start_date)
+        if end_date:
+            q = q.where(CoinTransaction.created_at <= end_date)
+        q = q.group_by(CoinTransaction.user_id).order_by(func.sum(CoinTransaction.coins).desc()).limit(limit)
+        rows = await db.execute(q)
+        users = []
+        for uid, coins in rows:
+            users.append({"user_id": int(uid), "coins_spent": int(coins or 0)})
+        return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_spenders": users}
+
+    # revenue
+    q = select(Order.user_id.label('user_id'), func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('total_revenue'))
+    if start_date:
+        q = q.where(Order.applied_at >= start_date)
+    if end_date:
+        q = q.where(Order.applied_at <= end_date)
+    if plan:
+        # join to subscriptions to filter by plan
+        q = q.join(Subscription, Subscription.user_id == Order.user_id).where(Subscription.plan_name == plan)
+    q = q.group_by(Order.user_id).order_by(func.sum(Order.subtotal_at_apply).desc()).limit(limit)
+    rows = await db.execute(q)
+    top = []
+    for uid, rev in rows:
+        # get coins counts for user in window
+        coins_q = select(func.coalesce(func.sum(CoinTransaction.coins), 0).label('coins')).where(CoinTransaction.user_id == uid)
+        if start_date:
+            coins_q = coins_q.where(CoinTransaction.created_at >= start_date)
+        if end_date:
+            coins_q = coins_q.where(CoinTransaction.created_at <= end_date)
+        coins_val = int((await db.execute(coins_q)).scalar() or 0)
+        top.append({"user_id": int(uid), "subscription_plan": None, "total_revenue": float(rev or 0.0), "coins_purchased": coins_val, "coins_spent": coins_val})
+
+    return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_spenders": top}
+
+
+@router.get("/api/monetization/users/top-active", dependencies=[Depends(require_admin)])
+async def users_top_active(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    limit: int = Query(10),
+    metric: str = Query('coins_spent'),
+    feature: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Top active users by coins_spent or actions."""
+    if metric == 'actions':
+        # use count of coin transactions as proxy for actions
+        q = select(CoinTransaction.user_id, func.count(CoinTransaction.id).label('total_actions'))
+        if start_date:
+            q = q.where(CoinTransaction.created_at >= start_date)
+        if end_date:
+            q = q.where(CoinTransaction.created_at <= end_date)
+        if feature:
+            q = q.where(CoinTransaction.source_type == feature)
+        q = q.group_by(CoinTransaction.user_id).order_by(func.count(CoinTransaction.id).desc()).limit(limit)
+        rows = await db.execute(q)
+        out = []
+        for uid, actions in rows:
+            coins_q = select(func.coalesce(func.sum(CoinTransaction.coins), 0)).where(CoinTransaction.user_id == uid)
+            coins_val = int((await db.execute(coins_q)).scalar() or 0)
+            out.append({"user_id": int(uid), "total_actions": int(actions), "total_coins_spent": coins_val, "avg_coins_per_action": round(coins_val / int(actions) if actions else 0, 2)})
+        return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_active_users": out}
+
+    # default coins_spent
+    q = select(CoinTransaction.user_id, func.coalesce(func.sum(CoinTransaction.coins), 0).label('total_coins_spent')).where(CoinTransaction.transaction_type == 'debit')
+    if start_date:
+        q = q.where(CoinTransaction.created_at >= start_date)
+    if end_date:
+        q = q.where(CoinTransaction.created_at <= end_date)
+    if feature:
+        q = q.where(CoinTransaction.source_type == feature)
+    q = q.group_by(CoinTransaction.user_id).order_by(func.sum(CoinTransaction.coins).desc()).limit(limit)
+    rows = await db.execute(q)
+    out = []
+    for uid, coins in rows:
+        actions_q = select(func.count(CoinTransaction.id)).where(CoinTransaction.user_id == uid)
+        actions_val = int((await db.execute(actions_q)).scalar() or 0)
+        out.append({"user_id": int(uid), "total_actions": actions_val, "total_coins_spent": int(coins or 0), "avg_coins_per_action": round(int(coins or 0) / actions_val if actions_val else 0, 2)})
+    return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_active_users": out}
+
+
+@router.get("/api/monetization/engagement/feature-breakdown", dependencies=[Depends(require_admin)])
+async def engagement_feature_breakdown(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    cohort: Optional[str] = Query(None),
+    detail: Optional[bool] = Query(False),
+    db: AsyncSession = Depends(get_db),
+):
+    """Engagement metrics by feature."""
+    q = select(CoinTransaction.source_type.label('feature'), func.count(CoinTransaction.id).label('total_actions'), func.count(func.distinct(CoinTransaction.user_id)).label('unique_users'), func.coalesce(func.sum(CoinTransaction.coins), 0).label('coins_spent'))
+    if start_date:
+        q = q.where(CoinTransaction.created_at >= start_date)
+    if end_date:
+        q = q.where(CoinTransaction.created_at <= end_date)
+    q = q.group_by(CoinTransaction.source_type).order_by(func.count(CoinTransaction.id).desc())
+    rows = await db.execute(q)
+    features = []
+    for feat, actions, uniq, coins in rows:
+        item = {"feature": feat, "total_actions": int(actions), "unique_users": int(uniq), "coins_spent": int(coins or 0)}
+        if detail and uniq:
+            item["avg_actions_per_user"] = round(int(actions) / int(uniq), 2)
+            item["avg_coins_per_user"] = round(int(coins or 0) / int(uniq), 2)
+        features.append(item)
+    return {"start_date": start_date, "end_date": end_date, "feature_breakdown": features}
+
+
+@router.get("/api/monetization/engagement/top-characters", dependencies=[Depends(require_admin)])
+async def engagement_top_characters(
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    limit: int = Query(10),
+    metric: str = Query('coins_spent'),
+    db: AsyncSession = Depends(get_db),
+):
+    """Top characters by coins spent or interactions."""
+    # assume character interactions are recorded in CoinTransaction with source_type 'character' and order_id linking to media or character id in other tables is not present
+    # try to join CharacterMedia or Character if possible; fallback: group by source_identifier in CoinTransaction if present
+    # For simplicity, we will aggregate by order_id which may include character id in some setups; otherwise return empty
+    ct = CoinTransaction
+    q = select(ct.order_id.label('character_id'), func.coalesce(func.sum(ct.coins), 0).label('coins_spent'), func.count(ct.id).label('interactions'), func.count(func.distinct(ct.user_id)).label('unique_users')).where(ct.source_type == 'character')
+    if start_date:
+        q = q.where(ct.created_at >= start_date)
+    if end_date:
+        q = q.where(ct.created_at <= end_date)
+    q = q.group_by(ct.order_id).order_by(func.sum(ct.coins).desc()).limit(limit)
+    rows = await db.execute(q)
+    out = []
+    for char_id, coins, interactions, uniq in rows:
+        out.append({"character_id": char_id, "character_name": None, "coins_spent": int(coins or 0), "interactions": int(interactions or 0), "unique_users": int(uniq or 0)})
+    return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_characters": out}
+
+
+@router.get("/api/monetization/promotions/performance", dependencies=[Depends(require_admin)])
+async def promotions_performance(
+    promo_code: Optional[str] = Query(None),
+    start_date: Optional[str] = Query(None),
+    end_date: Optional[str] = Query(None),
+    metric: Optional[str] = Query('revenue'),
+    status: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Promo performance metrics."""
+    pm = PromoManagement
+    q = select(pm.coupon.label('promo_code'), pm.promo_name, func.coalesce(func.count(Order.id), 0).label('times_redeemed'), func.coalesce(func.sum(func.case([(Order.subscription_id == None, 1)], else_=0)), 0).label('coin_purchase_count'), func.coalesce(func.sum(func.case([(Order.subscription_id != None, 1)], else_=0)), 0).label('subscription_count'), func.coalesce(func.sum(Order.discount_applied), 0).label('total_discount_given'), func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('total_revenue_generated'))
+    q = q.join(Order, Order.promo_id == pm.id)
+    if promo_code:
+        q = q.where(pm.coupon.ilike(f"%{promo_code}%"))
+    if status:
+        q = q.where(pm.status == status)
+    if start_date:
+        q = q.where(Order.applied_at >= start_date)
+    if end_date:
+        q = q.where(Order.applied_at <= end_date)
+    q = q.group_by(pm.coupon, pm.promo_name)
+    rows = await db.execute(q)
+    res = []
+    for promo_code, promo_name, times_redeemed, coin_purchase_count, subscription_count, total_discount_given, total_revenue_generated in rows:
+        times = int(times_redeemed or 0)
+        rev = float(total_revenue_generated or 0.0)
+        avg_rev = round(rev / times, 2) if times > 0 else 0.0
+        res.append({
+            "promo_code": promo_code,
+            "promo_name": promo_name,
+            "times_redeemed": times,
+            "coin_purchase_count": int(coin_purchase_count or 0),
+            "subscription_count": int(subscription_count or 0),
+            "total_discount_given": float(total_discount_given or 0.0),
+            "total_revenue_generated": rev,
+            "avg_revenue_per_use": avg_rev,
         })
-    
-    return {"cohorts": cohorts}
+    return {"start_date": start_date, "end_date": end_date, "promotions": res}
 
-# Verification login endpoint
-@router.get("/users/verification-login", dependencies=[Depends(require_admin)])
-async def get_verification_login(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get verification and login method statistics"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # Verification rate
-    total_users_result = await db.execute(
-        select(func.count(User.id))
-        .where(User.created_at >= start_date)
-        .where(User.created_at <= end_date)
-    )
-    total_users = total_users_result.scalar() or 0
-    
-    verified_users_result = await db.execute(
-        select(func.count(User.id))
-        .where(User.created_at >= start_date)
-        .where(User.created_at <= end_date)
-        .where(User.is_email_verified == True)
-    )
-    verified_users = verified_users_result.scalar() or 0
-    
-    verification_rate = (verified_users / total_users * 100) if total_users > 0 else 0
-    
-    # Login methods (simplified - based on whether user has password)
-    password_users_result = await db.execute(
-        select(func.count(User.id))
-        .where(User.created_at >= start_date)
-        .where(User.created_at <= end_date)
-        .where(User.hashed_password.isnot(None))
-    )
-    password_users = password_users_result.scalar() or 0
-    
-    oauth_users = total_users - password_users
-    
-    login_methods = [
-        {"method": "email", "count": password_users},
-        {"method": "oauth", "count": oauth_users}
-    ]
-    
-    return {
-        "verificationRatePct": float(verification_rate),
-        "loginMethods": login_methods
-    }
 
-# Heatmap endpoint
-@router.get("/engagement/heatmap", dependencies=[Depends(require_admin)])
-async def get_heatmap(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get message activity heatmap by day of week and hour"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    result = await db.execute(
-        select(
-            func.extract('dow', ChatMessage.created_at).label('weekday'),  # 0=Sunday, 6=Saturday
-            func.extract('hour', ChatMessage.created_at).label('hour'),
-            func.count(ChatMessage.id).label('messages')
-        )
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-        .group_by(
-            func.extract('dow', ChatMessage.created_at),
-            func.extract('hour', ChatMessage.created_at)
-        )
-    )
-    
-    matrix = []
-    for row in result.fetchall():
-        matrix.append({
-            "weekday": int(row.weekday),
-            "hour": int(row.hour),
-            "messages": row.messages
-        })
-    
-    return {"matrix": matrix}
+@router.get("/api/monetization/metrics/summary", dependencies=[Depends(require_admin)])
+async def metrics_summary(
+    as_of_date: Optional[str] = Query(None),
+    period: Optional[str] = Query('monthly'),
+    cohort: Optional[str] = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """High level SaaS KPIs: ARPU, MRR, churn, LTV, conversion."""
+    # MRR approximate: sum of subscription orders in current month
+    mrr_q = select(func.coalesce(func.sum(Order.subtotal_at_apply), 0)).where(Order.subscription_id != None)
+    if as_of_date:
+        mrr_q = mrr_q.where(func.to_char(Order.applied_at, 'YYYY-MM') == func.to_char(text(f"'{as_of_date}'::timestamp"), 'YYYY-MM'))
+    mrr = float((await db.execute(mrr_q)).scalar() or 0.0)
 
-# Model availability endpoint
-@router.get("/system/model-availability", dependencies=[Depends(require_admin)])
-async def get_model_availability(db: AsyncSession = Depends(get_db)) -> Dict[str, Any]:
-    """Get available models count (mock data - would integrate with model management)"""
-    # This would typically query your model configuration tables
-    # For now, returning mock data based on common AI model types
-    
-    return {
-        "chatModels": 5,  # e.g., GPT-4, Claude, etc.
-        "imageModels": 3,  # e.g., DALL-E, Midjourney, etc.
-        "speechModels": 2  # e.g., Whisper, TTS models
-    }
+    total_users = int((await db.execute(select(func.count(User.id)))).scalar() or 0)
+    paying_users = int((await db.execute(select(func.count(func.distinct(Order.user_id))))).scalar() or 0)
+    arpu = round(mrr / total_users, 2) if total_users > 0 else 0.0
 
-# Content trends endpoint
-@router.get("/content/trends", dependencies=[Depends(require_admin)])
-async def get_content_trends(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get trending character styles"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    result = await db.execute(
-        select(
-            Character.style,
-            func.count(ChatMessage.id).label('count')
-        )
-        .join(ChatMessage, Character.id == ChatMessage.character_id)
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-        .where(Character.style.isnot(None))
-        .group_by(Character.style)
-        .order_by(func.count(ChatMessage.id).desc())
-        .limit(10)
-    )
-    
-    styles = [{"style": row.style or "unknown", "count": row.count} for row in result.fetchall()]
-    
-    return {"styles": styles}
+    # churn naive: percent of subscriptions with status 'canceled' in last month / active_subscribers
+    churn_q = select(func.count(Subscription.id)).where(Subscription.status == 'canceled')
+    churn_count = int((await db.execute(churn_q)).scalar() or 0)
+    active_subscribers = int((await db.execute(select(func.count(Subscription.id)).where(Subscription.status == 'active'))).scalar() or 0)
+    churn_rate = round((churn_count / active_subscribers * 100), 2) if active_subscribers > 0 else 0.0
 
-# Promo summary endpoint
-@router.get("/promotions/summary", dependencies=[Depends(require_admin)])
-async def get_promo_summary(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get promotional codes summary"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # Total coupons
-    total_coupons_result = await db.execute(select(func.count(PromoManagement.promo_id)))
-    total_coupons = total_coupons_result.scalar() or 0
-    
-    # By status
-    status_result = await db.execute(
-        select(
-            PromoManagement.status,
-            func.count(PromoManagement.promo_id).label('count')
-        )
-        .group_by(PromoManagement.status)
-    )
-    by_status = [{"status": row.status, "count": row.count} for row in status_result.fetchall()]
-    
-    # Total redemptions in date range
-    total_redemptions_result = await db.execute(
-        select(func.count(PromoRedemption.redemption_id))
-        .where(PromoRedemption.applied_at >= start_date)
-        .where(PromoRedemption.applied_at <= end_date)
-    )
-    total_redemptions = total_redemptions_result.scalar() or 0
-    
-    # Total discount given
-    discount_given_result = await db.execute(
-        select(func.sum(PromoRedemption.discount_applied))
-        .where(PromoRedemption.applied_at >= start_date)
-        .where(PromoRedemption.applied_at <= end_date)
-    )
-    discount_given = float(discount_given_result.scalar() or 0)
-    
-    # Top promos
-    top_promos_result = await db.execute(
-        select(
-            PromoRedemption.promo_code,
-            func.count(PromoRedemption.redemption_id).label('redemptions'),
-            func.sum(PromoRedemption.discount_applied).label('discount')
-        )
-        .where(PromoRedemption.applied_at >= start_date)
-        .where(PromoRedemption.applied_at <= end_date)
-        .group_by(PromoRedemption.promo_code)
-        .order_by(func.count(PromoRedemption.redemption_id).desc())
-        .limit(10)
-    )
-    
-    top_promos = []
-    for row in top_promos_result.fetchall():
-        top_promos.append({
-            "promo_code": row.promo_code,
-            "redemptions": row.redemptions,
-            "discount": float(row.discount or 0)
-        })
-    
-    return {
-        "totalCoupons": total_coupons,
-        "byStatus": by_status,
-        "totalRedemptions": total_redemptions,
-        "discountGiven": discount_given,
-        "topPromos": top_promos
-    }
+    ltv = round((arpu / (churn_rate / 100)) if churn_rate > 0 else 0.0, 2)
 
-# Redemptions series endpoint
-@router.get("/promotions/redemptions-timeseries", dependencies=[Depends(require_admin)])
-async def get_redemptions_series(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get promo redemptions time series data"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    result = await db.execute(
-        select(
-            func.date(PromoRedemption.applied_at).label('date'),
-            func.count(PromoRedemption.redemption_id).label('redemptions'),
-            func.sum(PromoRedemption.discount_applied).label('discount')
-        )
-        .where(PromoRedemption.applied_at >= start_date)
-        .where(PromoRedemption.applied_at <= end_date)
-        .group_by(func.date(PromoRedemption.applied_at))
-        .order_by(func.date(PromoRedemption.applied_at))
-    )
-    
-    data = {}
-    for row in result.fetchall():
-        date_str = str(row.date)
-        data[date_str] = {
-            "redemptions": row.redemptions,
-            "discount": float(row.discount or 0)
-        }
-    
-    # Fill in missing dates
-    series = []
-    current_date = start_date.date()
-    end_date_only = end_date.date()
-    
-    while current_date <= end_date_only:
-        date_str = str(current_date)
-        day_data = data.get(date_str, {"redemptions": 0, "discount": 0.0})
-        series.append({
-            "date": date_str,
-            "redemptions": day_data["redemptions"],
-            "discount": day_data["discount"]
-        })
-        current_date += timedelta(days=1)
-    
-    return {"series": series}
+    conversion_rate = round((paying_users / total_users * 100), 2) if total_users > 0 else 0.0
 
-# Free vs Paid endpoint
-@router.get("/users/free-paid", dependencies=[Depends(require_admin)])
-async def get_free_paid(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get free vs paid users breakdown"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # Total active users in period
-    total_users_result = await db.execute(
-        select(func.count(distinct(ChatMessage.user_id)))
-        .where(ChatMessage.created_at >= start_date)
-        .where(ChatMessage.created_at <= end_date)
-    )
-    total_users = total_users_result.scalar() or 0
-    
-    # Paid users (with active subscriptions)
-    paid_users_result = await db.execute(
-        select(func.count(distinct(Subscription.user_id)))
-        .where(Subscription.status == 'active')
-    )
-    paid_users = paid_users_result.scalar() or 0
-    
-    free_users = max(0, total_users - paid_users)
-    
-    return {
-        "free": free_users,
-        "paid": paid_users
-    }
-
-# ARPU/LTV endpoint
-@router.get("/revenue/arpu-ltv", dependencies=[Depends(require_admin)])
-async def get_arpu_ltv(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get Average Revenue Per User and Lifetime Value"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # ARPU calculation
-    total_revenue_result = await db.execute(
-        select(func.sum(PricingPlan.price))
-        .join(Subscription, PricingPlan.plan_name == Subscription.plan_name)
-        .where(Subscription.status == 'active')
-    )
-    total_revenue = float(total_revenue_result.scalar() or 0)
-    
-    total_users_result = await db.execute(
-        select(func.count(distinct(Subscription.user_id)))
-        .where(Subscription.status == 'active')
-    )
-    total_users = total_users_result.scalar() or 1
-    
-    arpu = total_revenue / total_users if total_users > 0 else 0
-    
-    # LTV calculation (simplified - ARPU * average subscription length)
-    # In production, you'd want more sophisticated LTV calculation
-    avg_subscription_length = 12  # months (mock data)
-    ltv = arpu * avg_subscription_length
-    
-    return {
-        "arpu": float(arpu),
-        "ltv": float(ltv)
-    }
-
-# Paid conversion endpoint
-@router.get("/conversions/paid-conversion", dependencies=[Depends(require_admin)])
-async def get_paid_conversion(
-    date_range: str = Query("30d", description="Date range: 7d, 30d, 90d, 1y"),
-    db: AsyncSession = Depends(get_db)
-) -> Dict[str, Any]:
-    """Get free to paid conversion metrics"""
-    start_date, end_date = parse_date_range(date_range)
-    
-    # New users in period
-    new_users_result = await db.execute(
-        select(func.count(User.id))
-        .where(User.created_at >= start_date)
-        .where(User.created_at <= end_date)
-    )
-    new_users = new_users_result.scalar() or 0
-    
-    # New subscribers in period
-    new_subscribers_result = await db.execute(
-        select(func.count(Subscription.id))
-        .where(Subscription.created_at >= start_date)
-        .where(Subscription.created_at <= end_date)
-    )
-    new_subscribers = new_subscribers_result.scalar() or 0
-    
-    conversion_pct = (new_subscribers / new_users * 100) if new_users > 0 else 0
-    
-    return {
-        "newUsers": new_users,
-        "newSubscribers": new_subscribers,
-        "conversionPct": float(conversion_pct)
-    }
+    return {"as_of_date": as_of_date, "ARPU": arpu, "MRR": round(mrr, 2), "churn_rate": churn_rate, "LTV": ltv, "conversion_rate": conversion_rate, "active_subscribers": active_subscribers, "paying_users": paying_users, "total_users": total_users}

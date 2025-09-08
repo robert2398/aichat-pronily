@@ -1,6 +1,7 @@
 """
 Dependency overrides for authentication and roles.
 """
+from sqlalchemy.future import select
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from app.services.auth import AuthService
@@ -48,3 +49,9 @@ async def get_headers_api() -> dict[str, str]:
     "API-Key": settings.API_TOKEN
     }
     return headers
+
+async def check_admin(user_id: int, db: AsyncSession):
+    admin = await db.execute(select(User).where(User.id == user_id))
+    admin = admin.scalars().first()
+    if admin and admin.role.lower() == "admin":
+        return True

@@ -24,6 +24,8 @@ import httpx
 
 from fastapi.responses import StreamingResponse
 
+from app.services.subscription import check_user_wallet, deduct_user_coins
+
 router = APIRouter()
 
 @router.post("/create-image")
@@ -32,6 +34,7 @@ async def create_image(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    await check_user_wallet(db, user.id, "image")
     positive_prompt = await get_config_value_from_cache("IMAGE_POSITIVE_PROMPT")
     negative_prompt = await get_config_value_from_cache("IMAGE_NEGATIVE_PROMPT")
     prompt = await build_image_prompt(
@@ -100,7 +103,7 @@ async def create_image(
         await db.refresh(db_character_media)
         list_presigned_images.append(r["url"])
 
-
+    await deduct_user_coins(db, user.id, "image")
     return JSONResponse(
         content={
             "message": "Images created successfully",
@@ -115,7 +118,7 @@ async def create_video(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    
+    await check_user_wallet(db, user.id, "video")
     # Convert input image to base64 once
     # base64_image = await fetch_image_as_base64(image.image_s3_url)
 
@@ -160,7 +163,7 @@ async def create_video(
     db.add(db_character_media)
     await db.commit()
     await db.refresh(db_character_media)
-
+    await deduct_user_coins(db, user.id, "video")
     return JSONResponse(
         content={
             "message": "Images created successfully",

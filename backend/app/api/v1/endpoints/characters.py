@@ -3,11 +3,12 @@ Character endpoints for AI Friend Chatbot.
 """
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
-from sqlalchemy import select, delete, insert
+from sqlalchemy import select, delete, insert, func
 from app.schemas.character import CharacterCreate, CharacterRead
 from app.api.v1.deps import get_current_user
 from app.core.database import get_db
 from app.models.character import Character
+from app.models.chat import ChatMessage
 from app.models.user import User
 from app.core.config import settings
 from app.core.aws_s3 import upload_to_s3_file, get_file_from_s3_url
@@ -18,12 +19,10 @@ from app.core.aws_s3 import generate_presigned_url
 from app.services.app_config import get_config_value_from_cache
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
-import requests
-import os
 import base64
 from io import BytesIO
-from PIL import Image
 import datetime
+from app.services.subscription import check_user_wallet, deduct_user_coins
 
 router = APIRouter()
 
@@ -34,6 +33,7 @@ async def create_character(
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new AI friend character and generate its image."""
+    await check_user_wallet(db, user.id, "character")
     positive_prompt = await get_config_value_from_cache("IMAGE_POSITIVE_PROMPT")
     negative_prompt = await get_config_value_from_cache("IMAGE_NEGATIVE_PROMPT")
     prompt = await build_character_prompt(
@@ -126,7 +126,7 @@ async def create_character(
     db.add(db_character)
     await db.commit()
     await db.refresh(db_character)
-
+    await deduct_user_coins(db, user.id, "character")
     return JSONResponse(content={"message": "Character created successfully",
                                      "image_path" : presigned_s3_url}, status_code=200)
     
@@ -325,3 +325,28 @@ async def get_characters_by_user_id(
 
         output.append({"character": character_dict})
     return JSONResponse(content={"characters": output}, status_code=200)
+
+@router.get("/message-count")
+async def get_character_message_count(
+    db: AsyncSession = Depends(get_db)
+):
+    """Return message counts for all characters as a JSON list of
+    {"character_id": <id>, "count_message": <count>}.
+    Includes characters with zero messages.
+    """
+    # Left join characters with chat messages so characters with zero
+    # messages are included with count 0.
+    result = await db.execute(
+        select(Character.id, func.count(ChatMessage.id).label("count"))
+        .outerjoin(ChatMessage, ChatMessage.character_id == Character.id)
+        .group_by(Character.id)
+    )
+
+    rows = result.fetchall()
+    counts = []
+    for row in rows:
+        char_id = row[0]
+        cnt = int(row[1]) if row[1] is not None else 0
+        counts.append({"character_id": char_id, "count_message": cnt})
+
+    return JSONResponse(content=counts, status_code=200)

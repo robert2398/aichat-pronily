@@ -112,7 +112,7 @@ class CoinTransaction(Base):
     subscription_id = Column(String(100), ForeignKey("subscriptions.subscription_id"), nullable=True)
     transaction_type = Column(String(50), nullable=False)  # e.g. 'debit', 'credit'
     coins = Column(Integer, nullable=False)
-    source_type = Column(String(50), nullable=False)  # e.g. 'subscription', 'purchase', 'image', 'video', 'character'
+    source_type = Column(String(50), nullable=False)  # e.g. 'subscription', 'coin_purchase','chat', 'image', 'video', 'character'
     order_id = Column(String(100), nullable=False)
     period_start = Column(DateTime, nullable=True)
     period_end = Column(DateTime, nullable=True)

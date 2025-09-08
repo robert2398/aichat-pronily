@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Mars, Venus, Transgender, Image, Palette, Heart, MessageSquare } from "lucide-react";
 import Dropdown from "../ui/Dropdown";
+import { useMessageCounts } from "../../hooks/useMessageCounts";
 
 // simple pill
 function Pill({ active, children, onClick }) {
@@ -18,7 +19,7 @@ function Pill({ active, children, onClick }) {
   );
 }
 
-function CharacterTile({ item, onSelect }) {
+function CharacterTile({ item, onSelect, messageCount }) {
   return (
     <button
       type="button"
@@ -45,7 +46,7 @@ function CharacterTile({ item, onSelect }) {
             </span>
             <span className="inline-flex items-center gap-2 text-pink-300">
               <MessageSquare className="h-3.5 w-3.5" aria-hidden />
-              {item.messages}
+              {messageCount || "0"}
             </span>
           </div>
         </div>
@@ -76,6 +77,9 @@ export default function SelectCharacter() {
   const [characters, setCharacters] = useState([]);
   const [loadingChars, setLoadingChars] = useState(false);
   const [charsError, setCharsError] = useState(null);
+
+  // Fetch message counts for characters
+  const { getFormattedCount } = useMessageCounts(characters);
 
   const IMAGE_CACHE_KEY = "pronily:characters:image_cache";
   const IMAGE_CACHE_TTL = 10 * 60 * 60 * 1000; // 10 hours
@@ -334,7 +338,7 @@ export default function SelectCharacter() {
         ) : charsError ? (
           <div className="col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5 text-center text-sm text-red-400">{charsError}</div>
         ) : filteredCharacters.length > 0 ? (
-          filteredCharacters.map((c) => <CharacterTile key={c.id} item={c} onSelect={onSelect} />)
+          filteredCharacters.map((c) => <CharacterTile key={c.id} item={c} onSelect={onSelect} messageCount={getFormattedCount(c.id)} />)
         ) : (
           <div className="col-span-2 md:col-span-3 lg:col-span-4 xl:col-span-5 rounded-md border border-white/10 bg-white/[.02] p-6 text-center">
             <p className="text-white/70">No characters found for the selected filters.</p>

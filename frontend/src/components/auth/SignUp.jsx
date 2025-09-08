@@ -56,7 +56,7 @@ export default function SignUp(){
 
   return (
     <div className="space-y-8">
-      <h1 className="text-3xl font-semibold">Create an Account</h1>
+      <h1 className="text-3xl font-extrabold text-pink-200 drop-shadow-lg">Create Account For Free &amp; Receive 25 Tokens!</h1>
       <div className="space-y-6">
         <Field label="Email Id" placeholder="Enter email" value={email} onChange={setEmail} />
         <Field label="Password" placeholder="Enter password" value={pw} onChange={setPw} type={show? 'text':'password'} rightIcon={show ? <Eye className="h-5 w-5"/> : <EyeOff className="h-5 w-5"/>} onRightIconClick={()=>setShow(v=>!v)} />

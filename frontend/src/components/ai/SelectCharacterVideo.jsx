@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { Heart, MessageSquare } from "lucide-react";
+import { useMessageCounts } from "../../hooks/useMessageCounts";
 
-function ChatCharacterCard({ item, onOpen }) {
+function ChatCharacterCard({ item, onOpen, messageCount }) {
   return (
     <div className="relative">
       <button
@@ -29,7 +30,7 @@ function ChatCharacterCard({ item, onOpen }) {
               </span>
               <span className="inline-flex items-center gap-2 text-pink-300">
                 <MessageSquare className="h-3.5 w-3.5" aria-hidden />
-                {item.messages ?? "1M"}
+                {messageCount || "0"}
               </span>
             </div>
           </div>
@@ -45,6 +46,9 @@ export default function SelectCharacterVideo() {
   const [characters, setCharacters] = useState([]);
   const [loadingChars, setLoadingChars] = useState(false);
   const [charsError, setCharsError] = useState(null);
+
+  // Fetch message counts for characters
+  const { getFormattedCount } = useMessageCounts(characters);
 
   const IMAGE_CACHE_KEY = "pronily:characters:image_cache";
   const IMAGE_CACHE_TTL = 10 * 60 * 60 * 1000;
@@ -140,7 +144,7 @@ export default function SelectCharacterVideo() {
         ) : characters.length === 0 ? (
           <div className="col-span-full text-center text-sm text-white/70">No characters available.</div>
         ) : (
-          characters.map((c) => <ChatCharacterCard key={c.id} item={c} onOpen={onSelect} />)
+          characters.map((c) => <ChatCharacterCard key={c.id} item={c} onOpen={onSelect} messageCount={getFormattedCount(c.id)} />)
         )}
       </div>
     </section>

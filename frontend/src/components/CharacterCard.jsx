@@ -1,9 +1,15 @@
 import { Heart, MessageSquare } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useMessageCounts } from "../hooks/useMessageCounts";
 
 export default function CharacterCard({ id, name, img, age, bio, desc, likes, messages, views }) {
   const navigate = useNavigate();
   console.log("CharacterCard render", { id, name, img, likes, messages, views });
+  
+  // Get message count for this character
+  const { getFormattedCount } = useMessageCounts([{ id }]);
+  const messageCount = getFormattedCount(id);
+  
   const shortDesc = desc ?? bio ?? "";
 
   return (
@@ -36,7 +42,7 @@ export default function CharacterCard({ id, name, img, age, bio, desc, likes, me
             </span>
             <span className="inline-flex items-center gap-2 text-pink-300">
               <MessageSquare className="h-3.5 w-3.5" aria-hidden />
-              {messages ?? views ?? "1M"}
+              {messageCount || messages || views || "0"}
             </span>
           </div>
         </div>

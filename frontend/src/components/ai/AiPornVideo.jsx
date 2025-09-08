@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import PrimaryButton from "../auth/PrimaryButton";
 import ImageGenerationLoader from "./ImageGenerationLoader";
+import InsufficientCoinsModal from "../ui/InsufficientCoinsModal";
 
 // ---- inline icons (kept lightweight & themeable) ----
 function IconPlus({ className = "w-5 h-5" }) {
@@ -87,6 +88,7 @@ export default function AiPornVideo() {
   const [responseData, setResponseData] = useState(null);
   const [galleryItems, setGalleryItems] = useState([]);
   const [viewerItem, setViewerItem] = useState(null);
+  const [showInsufficientCoinsModal, setShowInsufficientCoinsModal] = useState(false);
   const [thumbCache, setThumbCache] = useState({}); // mediaUrl -> dataURL
 
   // read persisted selections if present; respect navigation state from SelectCharacter
@@ -347,6 +349,11 @@ export default function AiPornVideo() {
         });
 
         if (!res.ok) {
+          if (res.status === 402) {
+            // Handle insufficient coins gracefully
+            setShowInsufficientCoinsModal(true);
+            return;
+          }
           let text = await res.text();
           try { const j = JSON.parse(text); text = JSON.stringify(j); } catch (e) {}
           setError(`Server returned ${res.status}: ${text}`);
@@ -841,6 +848,12 @@ export default function AiPornVideo() {
         </div>
       </div>
       </div>
+
+      {/* Insufficient Coins Modal */}
+      <InsufficientCoinsModal 
+        open={showInsufficientCoinsModal} 
+        onClose={() => setShowInsufficientCoinsModal(false)} 
+      />
     </section>
   );
 }

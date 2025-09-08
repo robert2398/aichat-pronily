@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { PhoneCall, MoreVertical, Search, ChevronLeft, Send, ShieldCheck, Heart, MessageSquare } from "lucide-react";
+import InsufficientCoinsModal from "./ui/InsufficientCoinsModal";
+import { useMessageCounts } from "../hooks/useMessageCounts";
 
 // prefer S3 image url, fall back to local img — keep a single source-of-truth
 const getCharacterImageUrl = (c) => {
@@ -9,7 +11,7 @@ const getCharacterImageUrl = (c) => {
   return a || b;
 };
 
-function ChatCharacterCard({ item, onOpen }) {
+function ChatCharacterCard({ item, onOpen, messageCount }) {
   return (
     <div className="relative">
       <button
@@ -37,7 +39,7 @@ function ChatCharacterCard({ item, onOpen }) {
               </span>
               <span className="inline-flex items-center gap-2 text-pink-300">
                 <MessageSquare className="h-3.5 w-3.5" aria-hidden />
-                {item.messages ?? "1M"}
+                {messageCount || "0"}
               </span>
             </div>
           </div>
@@ -101,8 +103,12 @@ export default function AiChat() {
   const [isSending, setIsSending] = useState(false);
   const [galleryItems, setGalleryItems] = useState([]);
   const [showAllGallery, setShowAllGallery] = useState(false);
+  const [showInsufficientCoinsModal, setShowInsufficientCoinsModal] = useState(false);
   const [galleryFetchStatus, setGalleryFetchStatus] = useState("");
   const [galleryFetchUrl, setGalleryFetchUrl] = useState("");
+
+  // Fetch message counts for characters
+  const { getFormattedCount } = useMessageCounts(characters);
 
   // Session id management: keep a stable id for the lifetime of the page/tab
   const ensureSessionId = (characterId) => {
@@ -660,6 +666,11 @@ export default function AiChat() {
 
         const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) });
         if (!res.ok) {
+          if (res.status === 402) {
+            // Handle insufficient coins gracefully
+            setShowInsufficientCoinsModal(true);
+            return;
+          }
           const txt = await res.text();
           throw new Error(txt || res.statusText || `HTTP ${res.status}`);
         }
@@ -833,7 +844,7 @@ export default function AiChat() {
               <div className="col-span-full text-center text-sm text-white/70">No characters found.</div>
             ) : (
               characters.map((c) => (
-                <ChatCharacterCard key={c.id} item={c} onOpen={openChatFor} />
+                <ChatCharacterCard key={c.id} item={c} onOpen={openChatFor} messageCount={getFormattedCount(c.id)} />
               ))
             )}
           </div>
@@ -1238,6 +1249,12 @@ export default function AiChat() {
           </div>
         </div>
       </div>
+
+      {/* Insufficient Coins Modal */}
+      <InsufficientCoinsModal 
+        open={showInsufficientCoinsModal} 
+        onClose={() => setShowInsufficientCoinsModal(false)} 
+      />
     </main>
   );
 }

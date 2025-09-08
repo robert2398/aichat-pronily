@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, WebSocket, Reques
 from fastapi.responses import StreamingResponse
 from app.schemas.chat import ChatCreate, MessageCreate, MessageRead
 from app.models.chat import ChatMessage
+from app.models.subscription import UserWallet, CoinTransaction
 from app.models.character import Character
 from app.services.character_media import get_headers_api
 from app.services.chat import generate_chat, approximate_token_count                 
@@ -12,13 +13,36 @@ from app.api.v1.deps import get_current_user
 from app.core.database import get_db
 from app.core.config import settings
 from app.services.app_config import get_config_value_from_cache
+from app.services.subscription import check_user_wallet, deduct_user_coins
 from typing import List
 import asyncio
 import json
 import requests
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc
+from sqlalchemy import Column, select, desc
 from fastapi.responses import JSONResponse
+
+import re
+
+def clean_model_output(text: str) -> str:
+    """
+    Keep only the content after the *last* assistant marker
+    and strip junk like analysis, commentary, etc.
+    """
+    # Always find the last "assistantfinal"
+    match = list(re.finditer(r"assistantfinal", text, re.IGNORECASE))
+    if match:
+        cut = match[-1].end()
+        text = text[cut:]
+    
+    # Remove obvious junk tokens
+    text = re.sub(r"(?is)(analysis|reasoning|commentary).*", "", text).strip()
+    
+    # Clean leftover quotes/braces
+    text = text.strip()
+    text = text.strip("{}[]\"'")
+    
+    return text.strip()
 
 router = APIRouter()
 #response_model=ChatCreate
@@ -50,6 +74,7 @@ async def get_all_chats(user=Depends(get_current_user), user_id: int = None, db:
 @router.post("/" )
 async def start_chat(chat: ChatCreate, user=Depends(get_current_user),
                      db: AsyncSession = Depends(get_db)):
+    await check_user_wallet(db, user.id, "chat")
     headers = await get_headers_api()
     # Fetch last n messages for the session_id, ordered by your timestamp or id
     chat_limit = await get_config_value_from_cache("CHAT_HISTORY_LIMIT")
@@ -60,9 +85,39 @@ async def start_chat(chat: ChatCreate, user=Depends(get_current_user),
     if character_id:
         result = await db.execute(select(Character).where(Character.id == character_id))
         character = result.scalar_one_or_none()
-        name = character.name if character else "Unknown"
-        bio = character.bio if character else ""
-        gender = character.gender if character else ""
+        # Build a safe JSON string with a few important character fields.
+        # The Character model doesn't provide a to_dict() helper, so serialize manually.
+        
+
+    
+        
+        if character:
+            char_dict = {
+                "style": character.style or "",
+                "ethnicity": character.ethnicity or "",
+                "age": character.age or 0,
+                "eye_colour": character.eye_colour or "",
+                "hair_style": character.hair_style or "",
+                "hair_colour": character.hair_colour or "",
+                "body_type": character.body_type or "",
+                "breast_size": character.breast_size or "",
+                "butt_size": character.butt_size or "",
+                "dick_size": character.dick_size or "",
+                "personality": character.personality or "",
+                "voice_type": character.voice_type or "",
+                "relationship_type": character.relationship_type or "",
+                "clothing": character.clothing or "",
+                "special_features": character.special_features or "",
+            }
+            json_character_details = json.dumps(char_dict)
+            name = character.name or "Unknown"
+            bio = character.bio or ""
+            gender = character.gender or ""
+        else:
+            json_character_details = ""
+            name = "Unknown"
+            bio = ""
+            gender = ""
     ################# DELETE THIS LATER. SHOULD COME FROM UI
     is_sfw = False
     #####################
@@ -70,7 +125,7 @@ async def start_chat(chat: ChatCreate, user=Depends(get_current_user),
         system_prompt = await get_config_value_from_cache("CHAT_GEN_PROMPT_SFW")
     else:
         system_prompt = await get_config_value_from_cache("CHAT_GEN_PROMPT_NSFW")
-    system_prompt = system_prompt.replace("replace_character_name", name).replace("replace_character_bio", bio).replace("replace_character_gender", gender)
+    system_prompt = system_prompt.replace("replace_character_name", name).replace("replace_character_bio", bio).replace("replace_character_gender", gender).replace("replace_character_details", json_character_details)
     result = await db.execute(
         select(ChatMessage)
         .where(ChatMessage.session_id == chat.session_id)
@@ -86,18 +141,30 @@ async def start_chat(chat: ChatCreate, user=Depends(get_current_user),
         messages.append({"role": "assistant", "content": msg.ai_message})
     messages.append({"role": "user", "content": chat.user_query})
     token_count = await approximate_token_count(messages)
+    # data = {
+    #     "messages": messages,
+    #     "stream": False,
+    #     "username" : username
+    # }
+    DEFAULT_STOP = ["<think>", "</think>", "Reasoning:", "Analysis:", "[analysis]", "[/analysis]"]
     data = {
         "messages": messages,
-        "stream": False,
-        "username" : username
+        "max_new_tokens": 1024,
+        "temperature": 1.5,
+        "top_p": 0.95,
+        "stop": DEFAULT_STOP,
     }
     print('Sending request to chat API with payload : ', data)
-    response = requests.post(chat_url, headers=headers, json=data)
-    print(response.text)
-    if response.status_code != 200:
-        raise HTTPException(status_code=502, detail="Chat API error")
-    chat_output = response.json()['message']['content']
-    
+    # response = requests.post(chat_url, headers=headers, json=data)
+    # print(response.text)
+    # if response.status_code != 200:
+    #     raise HTTPException(status_code=502, detail="Chat API error")
+    # chat_output = response.json()['message']['content']
+
+    response = requests.post(chat_url, json=data)
+    chat_output = response.json().get("response", "")
+    chat_output = clean_model_output(chat_output)
+
     new_message = ChatMessage(
         session_id=chat.session_id,
         user_id=user.id,
@@ -108,7 +175,7 @@ async def start_chat(chat: ChatCreate, user=Depends(get_current_user),
     )
     db.add(new_message)
     await db.commit()
-    await db.refresh(new_message)
+    await deduct_user_coins(db, user.id, "chat")
     return JSONResponse(content={"chat_response": chat_output}, status_code=200)
 
 @router.get("/get-messages", response_model=List[MessageRead])

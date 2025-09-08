@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import ImageGenerationLoader from './ai/ImageGenerationLoader';
+import InsufficientCoinsModal from './ui/InsufficientCoinsModal';
 import { useLocation, useNavigate } from "react-router-dom";
 
 export default function CreateCharacterSave({ character: propsCharacter = null, gender: propsGender = null }) {
@@ -16,6 +17,7 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
   const [enhancedPrompt, setEnhancedPrompt] = useState(false);
   const [loading, setLoading] = useState(false);
   const [resuming, setResuming] = useState(false);
+  const [showInsufficientCoinsModal, setShowInsufficientCoinsModal] = useState(false);
   // animation state for create-character progress visualization
   const [animStep, setAnimStep] = useState('parse');
   const [animTimer, setAnimTimer] = useState(null);
@@ -121,6 +123,13 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
+        if (res.status === 402) {
+          // Handle insufficient coins gracefully
+          setAnimating(false);
+          stopAnimProgression();
+          setShowInsufficientCoinsModal(true);
+          return;
+        }
         const text = await res.text();
         throw new Error(text || res.statusText);
       }
@@ -195,6 +204,13 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
         });
         console.debug('CreateCharacterSave: resume response status=', res && res.status);
         if (!res.ok) {
+          if (res.status === 402) {
+            // Handle insufficient coins gracefully
+            setAnimating(false);
+            stopAnimProgression();
+            setShowInsufficientCoinsModal(true);
+            return;
+          }
           const text = await res.text();
           throw new Error(text || res.statusText || `HTTP ${res.status}`);
         }
@@ -255,6 +271,12 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
             <button onClick={saveCharacter} disabled={loading} className="rounded-xl bg-gradient-to-r from-pink-600 via-pink-400 to-indigo-500 px-4 py-2 font-semibold text-white">{loading ? 'Saving...' : 'Save'}</button>
           </div>
         </div>
+
+        {/* Insufficient Coins Modal */}
+        <InsufficientCoinsModal 
+          open={showInsufficientCoinsModal} 
+          onClose={() => setShowInsufficientCoinsModal(false)} 
+        />
       </div>
     </main>
   );
