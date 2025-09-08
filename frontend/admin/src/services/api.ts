@@ -777,6 +777,38 @@ class APIService {
       throw error;
     }
   }
+
+  async getKpiMetrics(params: {
+    asOfDate?: string;
+    period?: string;
+  } = {}): Promise<{
+    total_revenue: number;
+    active_users: number;
+    conversion_rate: number;
+    avg_order_value: number;
+    currency: string;
+    previous_period?: {
+      total_revenue: number;
+      active_users: number;
+      conversion_rate: number;
+      avg_order_value: number;
+    };
+  }> {
+    try {
+      console.log('🚀 API Service: Calling KPI metrics endpoint with params:', params);
+      const response = await this.api.get('/admin/dashboard/metrics/summary', {
+        params: {
+          as_of_date: params.asOfDate,
+          period: params.period || 'monthly',
+        }
+      });
+      console.log('✅ API Service: KPI metrics response:', response.data);
+      return response.data;
+    } catch (error) {
+      console.error('❌ API Service: Error fetching KPI metrics:', error);
+      throw error;
+    }
+  }
 }
 
 export const apiService = new APIService();

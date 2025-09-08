@@ -10,7 +10,8 @@ import {
   ListItemText,
   useTheme,
   useMediaQuery,
-  alpha
+  alpha,
+  Collapse
 } from '@mui/material';
 import { 
   Home as HomeIcon,
@@ -24,6 +25,15 @@ import {
   Bolt as BoltIcon,
   PriceChange as PricingIcon
 } from '@mui/icons-material';
+// Analytics submenu items nested under Dashboard
+const dashboardSubItems = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'monetization', label: 'Monetization' },
+  { id: 'subscriptions', label: 'Subscriptions' },
+  { id: 'coins', label: 'Coins' },
+  { id: 'engagement', label: 'Engagement' },
+  { id: 'promotions', label: 'Promotions' },
+];
 
 interface SidebarProps {
   isOpen: boolean;
@@ -52,6 +62,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
+  const [dashExpandedStored, setDashExpandedStored] = React.useState<boolean>(() => {
+    try { return localStorage.getItem('dashboardSubmenuExpanded') === 'true'; } catch { return false; }
+  });
+  const onDashboardRoute = location.pathname.startsWith('/admin/dashboard');
+  const forcedOpen = onDashboardRoute; // keep expanded when on any dashboard analytics hash
+  const [hoverOpen, setHoverOpen] = React.useState(false); // desktop hover preview
+  const dashOpen = forcedOpen || dashExpandedStored || hoverOpen;
+
+  React.useEffect(() => {
+    try { localStorage.setItem('dashboardSubmenuExpanded', String(dashExpandedStored)); } catch {/* ignore */}
+  }, [dashExpandedStored]);
+
+  // Close hover preview when route changes away
+  React.useEffect(() => { if (!onDashboardRoute && !dashExpandedStored) setHoverOpen(false); }, [onDashboardRoute, dashExpandedStored]);
 
   const handleNavClick = (path: string) => {
     navigate(path);
@@ -76,43 +100,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
           
           return (
             <ListItem key={item.id} disablePadding sx={{ mb: 0.25 }}>
-              <ListItemButton
-                onClick={() => handleNavClick(item.path)}
-                sx={{
-                  borderRadius: 2,
-                  px: 2,
-                  py: 1.5,
-                  minHeight: 48,
-                  bgcolor: isActive ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
-                  color: isActive ? theme.palette.primary.main : 'grey.700',
-                  boxShadow: isActive ? 1 : 0,
-                  '&:hover': {
-                    bgcolor: isActive ? alpha(theme.palette.primary.main, 0.10) : alpha(theme.palette.grey[500], 0.1),
-                  },
-                  transition: 'all 0.2s ease-in-out'
-                }}
-              >
-                <ListItemIcon sx={{ minWidth: 40 }}>
-                  <Icon 
-                    sx={{ 
-                      fontSize: 20,
-                      color: isActive ? 'black' : 'grey.500',
-                    }} 
-                  />
-                </ListItemIcon>
-                <ListItemText 
-                  primary={item.label}
+              {item.id !== 'dashboard' && (
+                <ListItemButton
+                  onClick={() => handleNavClick(item.path)}
                   sx={{
-                    '& .MuiListItemText-primary': {
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis'
-                    }
+                    borderRadius: 2,
+                    px: 2,
+                    py: 1.5,
+                    minHeight: 48,
+                    bgcolor: isActive ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+                    color: isActive ? theme.palette.primary.main : 'grey.700',
+                    boxShadow: isActive ? 1 : 0,
+                    '&:hover': {
+                      bgcolor: isActive ? alpha(theme.palette.primary.main, 0.10) : alpha(theme.palette.grey[500], 0.1),
+                    },
+                    transition: 'all 0.2s ease-in-out'
                   }}
+                >
+                  <ListItemIcon sx={{ minWidth: 40 }}>
+                    <Icon 
+                      sx={{ 
+                        fontSize: 20,
+                        color: isActive ? 'black' : 'grey.500',
+                      }} 
+                    />
+                  </ListItemIcon>
+                  <ListItemText 
+                    primary={item.label}
+                    sx={{
+                      '& .MuiListItemText-primary': {
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }
+                    }}
+                  />
+                </ListItemButton>
+              )}
+              {item.id === 'dashboard' && (
+                <DashboardMenu
+                  icon={Icon}
+                  open={dashOpen}
+                  forcedOpen={forcedOpen}
+                  setHoverOpen={setHoverOpen}
+                  expandedStored={dashExpandedStored}
+                  setExpandedStored={setDashExpandedStored}
                 />
-              </ListItemButton>
+              )}
             </ListItem>
           );
         })}
@@ -143,5 +179,167 @@ export const Sidebar: React.FC<SidebarProps> = ({
     >
       {drawerContent}
     </Drawer>
+  );
+};
+
+interface DashboardMenuProps {
+  icon: React.ElementType;
+  open: boolean;
+  forcedOpen: boolean;
+  setHoverOpen: (v: boolean) => void;
+  expandedStored: boolean;
+  setExpandedStored: React.Dispatch<React.SetStateAction<boolean>>;
+}
+
+const DashboardMenu: React.FC<DashboardMenuProps> = ({ icon: Icon, open, forcedOpen, setHoverOpen, expandedStored, setExpandedStored }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
+  const buttonRef = React.useRef<HTMLDivElement | null>(null);
+  const panelRef = React.useRef<HTMLDivElement | null>(null);
+
+  const onEnterDashboard = () => {
+    if (!isMobile) setHoverOpen(true);
+  };
+  const onLeaveDashboard = () => {
+    if (!isMobile && !forcedOpen && !expandedStored) setHoverOpen(false);
+  };
+
+  const toggleExpand = () => {
+    if (forcedOpen) return; // can't collapse while on dashboard route
+    setExpandedStored(v => !v);
+  };
+
+  const handleSubClick = (id: string) => {
+    if (id === 'overview') {
+      if (location.pathname.startsWith('/admin/dashboard')) {
+        window.history.replaceState(null, '', '/admin/dashboard');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        navigate('/admin/dashboard');
+      }
+      return;
+    }
+    if (location.pathname.startsWith('/admin/dashboard')) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.history.replaceState(null, '', `/admin/dashboard#${id}`);
+      }
+    } else {
+      navigate(`/admin/dashboard#${id}`);
+    }
+  };
+
+  const activeHash = location.hash.replace('#','');
+  const activeSub = location.pathname.startsWith('/admin/dashboard') ? (activeHash || 'overview') : null;
+
+  // Keyboard nav
+  const onTriggerKeyDown: React.KeyboardEventHandler = (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpand(); }
+    else if (e.key === 'ArrowDown' && open) {
+      e.preventDefault(); panelRef.current?.querySelector<HTMLElement>('button[data-sub-item]')?.focus();
+    } else if (e.key === 'Escape' && !forcedOpen) {
+      setHoverOpen(false); setExpandedStored(false);
+    }
+  };
+
+  const onPanelKeyDown: React.KeyboardEventHandler = (e) => {
+    if (e.key === 'Escape' && !forcedOpen) { setHoverOpen(false); setExpandedStored(false); buttonRef.current?.focus(); }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const focusables = panelRef.current?.querySelectorAll<HTMLButtonElement>('button[data-sub-item]');
+      if (!focusables) return;
+      const idx = Array.from(focusables).indexOf(document.activeElement as HTMLButtonElement);
+      const next = focusables[(idx + 1) % focusables.length];
+      next.focus();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const focusables = panelRef.current?.querySelectorAll<HTMLButtonElement>('button[data-sub-item]');
+      if (!focusables) return;
+      const idx = Array.from(focusables).indexOf(document.activeElement as HTMLButtonElement);
+      const prev = focusables[(idx - 1 + focusables.length) % focusables.length];
+      prev.focus();
+    }
+  };
+
+  return (
+    <div
+      onMouseEnter={onEnterDashboard}
+      onMouseLeave={onLeaveDashboard}
+      style={{ width: '100%', position: 'relative' }}
+    >
+      <ListItemButton
+        ref={buttonRef as any}
+        aria-haspopup="true"
+        aria-expanded={open}
+        aria-controls="dashboard-analytics-submenu"
+        onKeyDown={onTriggerKeyDown}
+        onClick={toggleExpand}
+        sx={{
+          borderRadius: 2,
+          px: 2,
+          py: 1.5,
+            minHeight: 48,
+          bgcolor: open ? alpha(theme.palette.primary.main, 0.08) : 'transparent',
+          color: open ? theme.palette.primary.main : 'grey.700',
+          boxShadow: open ? 1 : 0,
+          '&:hover': { bgcolor: open ? alpha(theme.palette.primary.main, 0.10) : alpha(theme.palette.grey[500], 0.1) },
+          transition: 'all 0.2s ease-in-out'
+        }}
+      >
+        <ListItemIcon sx={{ minWidth: 40 }}>
+          <Icon sx={{ fontSize: 20, color: open ? 'black' : 'grey.500' }} />
+        </ListItemIcon>
+        <ListItemText
+          primary={"Dashboard"}
+          sx={{ '& .MuiListItemText-primary': { fontSize: '0.875rem', fontWeight: 600 } }}
+        />
+        <span aria-hidden style={{ marginLeft: 'auto', fontSize: 10, transform: open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform .2s', color: open ? theme.palette.primary.main : theme.palette.grey[500] }}>▶</span>
+      </ListItemButton>
+
+      {/* Inline nested submenu for all breakpoints */}
+      <Collapse in={open} timeout={180} unmountOnExit>
+        <Box id="dashboard-analytics-submenu" role="menu" aria-label="Dashboard analytics submenu" ref={panelRef} onKeyDown={onPanelKeyDown} sx={{ pl: 4, pr: 1.5, pb: 0.5, pt: 0.25 }}>
+          {dashboardSubItems.map(si => {
+            const active = activeSub === si.id;
+            return (
+              <ListItemButton
+                key={si.id}
+                data-sub-item
+                role="menuitem"
+                onClick={() => handleSubClick(si.id)}
+                sx={{
+                  borderRadius: 1.5,
+                  py: 0.625,
+                  px: 1.25,
+                  mt: 0.25,
+                  fontSize: '0.875rem',
+                  minHeight: 36,
+                  position: 'relative',
+                  bgcolor: active ? alpha(theme.palette.primary.main, 0.15) : 'transparent',
+                  color: active ? theme.palette.primary.main : 'grey.700',
+                  '&:before': {
+                    content: '""',
+                    position: 'absolute',
+                    left: -16,
+                    top: 0,
+                    bottom: 0,
+                    width: 2,
+                    borderRadius: 1,
+                    bgcolor: active ? theme.palette.primary.main : 'transparent',
+                    transition: 'background-color .2s'
+                  },
+                  '&:hover': { bgcolor: active ? alpha(theme.palette.primary.main, 0.22) : alpha(theme.palette.grey[500], 0.10) }
+                }}
+              >
+                <ListItemText primary={si.label} primaryTypographyProps={{ fontSize: '0.800rem', fontWeight: 500 }} />
+              </ListItemButton>
+            );
+          })}
+        </Box>
+      </Collapse>
+    </div>
   );
 };

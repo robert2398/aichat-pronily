@@ -2,6 +2,7 @@ import React, { Suspense, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '../../admin/src/components/Sidebar';
 import { DateRangeProvider } from '../../admin/src/contexts/DateRangeContext';
+import { FiltersProvider } from '../../admin/src/contexts/FiltersContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const adminQueryClient = new QueryClient({
@@ -19,6 +20,7 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-[#f8fafc] text-black">
       <QueryClientProvider client={adminQueryClient}>
         <DateRangeProvider>
+        <FiltersProvider>
         {/* Sidebar from admin app. It expects props isOpen and onClose. */}
         <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
 
@@ -30,6 +32,7 @@ export default function AdminLayout() {
             </Suspense>
           </div>
         </main>
+        </FiltersProvider>
         </DateRangeProvider>
       </QueryClientProvider>
     </div>

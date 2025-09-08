@@ -149,6 +149,55 @@ export const dashboardApi = {
     updated_at: string;
   }> }> =>
     fetchData('/system/app-config/changes', from, to, token),
+
+  getKpiMetrics: async (params: {
+    asOfDate?: string;
+    period?: string;
+    cohort?: string;
+    token?: string;
+  } = {}): Promise<{
+    total_revenue: number;
+    active_users: number;
+    conversion_rate: number;
+    avg_order_value: number;
+    currency: string;
+    previous_period?: {
+      total_revenue: number;
+      active_users: number;
+      conversion_rate: number;
+      avg_order_value: number;
+    };
+  }> => {
+    const searchParams = new URLSearchParams();
+    if (params.asOfDate) searchParams.set('as_of_date', params.asOfDate);
+    if (params.period) searchParams.set('period', params.period);
+    if (params.cohort) searchParams.set('cohort', params.cohort);
+    
+    const url = `${API_BASE_URL}/admin/dashboard/api/monetization/metrics/summary?${searchParams}`;
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    // Prefer explicit token param; otherwise use stored user token
+    const authToken = params.token || (typeof localStorage !== 'undefined' ? localStorage.getItem('pronily:auth:token') : null);
+    if (authToken) {
+      const normalizedToken = authToken.toLowerCase().startsWith('bearer ') ? authToken.slice(7) : authToken;
+      headers.Authorization = `bearer ${normalizedToken}`;
+    }
+    
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result.data;
+  },
 };
 
 // Formatters

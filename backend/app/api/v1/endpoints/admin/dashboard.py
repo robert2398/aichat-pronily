@@ -18,7 +18,7 @@ def _date_range_defaults(start_date: Optional[str], end_date: Optional[str]):
     return start_date, end_date
 
 
-@router.get("/api/monetization/coins/purchases-summary", dependencies=[Depends(require_admin)])
+@router.get("/coins/purchases-summary", dependencies=[Depends(require_admin)])
 async def coins_purchases_summary(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -69,7 +69,7 @@ async def coins_purchases_summary(
     return response
 
 
-@router.get("/api/monetization/coins/usage-by-feature", dependencies=[Depends(require_admin)])
+@router.get("/coins/usage-by-feature", dependencies=[Depends(require_admin)])
 async def coins_usage_by_feature(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -109,7 +109,7 @@ async def coins_usage_by_feature(
     return {"start_date": start_date, "end_date": end_date, "total_coins_spent": total_coins, "by_feature": features}
 
 
-@router.get("/api/monetization/subscriptions/plan-summary", dependencies=[Depends(require_admin)])
+@router.get("/subscriptions/plan-summary", dependencies=[Depends(require_admin)])
 async def subscriptions_plan_summary(
     as_of_date: Optional[str] = Query(None),
     include_inactive: Optional[bool] = Query(False),
@@ -145,7 +145,7 @@ async def subscriptions_plan_summary(
     return {"as_of_date": as_of_date, "total_active_subscribers": total_active, "plans": plans, "highest_retention_plan": highest_retention_plan}
 
 
-@router.get("/api/monetization/subscriptions/history", dependencies=[Depends(require_admin)])
+@router.get("/subscriptions/history", dependencies=[Depends(require_admin)])
 async def subscriptions_history(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -184,7 +184,7 @@ async def subscriptions_history(
     return {"metric": metric, "interval": interval, "history": []}
 
 
-@router.get("/api/monetization/users/lifetime-value", dependencies=[Depends(require_admin)])
+@router.get("/users/lifetime-value", dependencies=[Depends(require_admin)])
 async def users_lifetime_value(
     user_id: Optional[int] = Query(None),
     detailed: Optional[bool] = Query(False),
@@ -231,7 +231,7 @@ async def users_lifetime_value(
     return {"average_ltv": avg_ltv, "total_revenue_all_users": round(total_rev, 2), "total_users": total_users}
 
 
-@router.get("/api/monetization/revenue/trends", dependencies=[Depends(require_admin)])
+@router.get("/revenue/trends", dependencies=[Depends(require_admin)])
 async def revenue_trends(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -275,7 +275,7 @@ async def revenue_trends(
     return {"currency": "USD", "interval": interval, "revenue_trends": trends, "total_revenue_all_periods": round(total, 2), "avg_monthly_revenue": avg_monthly}
 
 
-@router.get("/api/monetization/coins/trends", dependencies=[Depends(require_admin)])
+@router.get("/coins/trends", dependencies=[Depends(require_admin)])
 async def coins_trends(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -312,7 +312,7 @@ async def coins_trends(
     return {"interval": interval, "coin_trends": trends, "net_coins_change": net, "purchase_to_spend_ratio": ratio}
 
 
-@router.get("/api/monetization/users/top-spenders", dependencies=[Depends(require_admin)])
+@router.get("/users/top-spenders", dependencies=[Depends(require_admin)])
 async def users_top_spenders(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -361,7 +361,7 @@ async def users_top_spenders(
     return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_spenders": top}
 
 
-@router.get("/api/monetization/users/top-active", dependencies=[Depends(require_admin)])
+@router.get("/users/top-active", dependencies=[Depends(require_admin)])
 async def users_top_active(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -407,7 +407,7 @@ async def users_top_active(
     return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_active_users": out}
 
 
-@router.get("/api/monetization/engagement/feature-breakdown", dependencies=[Depends(require_admin)])
+@router.get("/engagement/feature-breakdown", dependencies=[Depends(require_admin)])
 async def engagement_feature_breakdown(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -433,7 +433,7 @@ async def engagement_feature_breakdown(
     return {"start_date": start_date, "end_date": end_date, "feature_breakdown": features}
 
 
-@router.get("/api/monetization/engagement/top-characters", dependencies=[Depends(require_admin)])
+@router.get("/engagement/top-characters", dependencies=[Depends(require_admin)])
 async def engagement_top_characters(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
@@ -459,7 +459,7 @@ async def engagement_top_characters(
     return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_characters": out}
 
 
-@router.get("/api/monetization/promotions/performance", dependencies=[Depends(require_admin)])
+@router.get("/promotions/performance", dependencies=[Depends(require_admin)])
 async def promotions_performance(
     promo_code: Optional[str] = Query(None),
     start_date: Optional[str] = Query(None),
@@ -500,7 +500,7 @@ async def promotions_performance(
     return {"start_date": start_date, "end_date": end_date, "promotions": res}
 
 
-@router.get("/api/monetization/metrics/summary", dependencies=[Depends(require_admin)])
+@router.get("/metrics/summary", dependencies=[Depends(require_admin)])
 async def metrics_summary(
     as_of_date: Optional[str] = Query(None),
     period: Optional[str] = Query('monthly'),
