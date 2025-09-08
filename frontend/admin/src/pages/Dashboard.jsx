@@ -10,6 +10,10 @@ import { useScrollToHashOnMount } from '../hooks/useScrollToHashOnMount'
 import { CoinsPurchasedSummary } from '../components/CoinsPurchasedSummary'
 import { CoinsByFeature } from '../components/CoinsByFeature'
 import { CoinsPurchasedVsSpent } from '../components/CoinsPurchasedVsSpent'
+import { FeatureEngagementBreakdown } from '../components/FeatureEngagementBreakdown'
+import { TopCharacters } from '../components/TopCharacters'
+import { TopActiveUsersTable } from '../components/TopActiveUsersTable'
+import { engagementApi } from '../services/engagementApi.ts'
 
 // IMPORTANT: Only ONE dashboard file now (.jsx). Removed .tsx duplicate so this file is what lazy() loads.
 
@@ -87,6 +91,43 @@ export default function Dashboard() {
 
   // When user clicks Coins in sidebar, components already listen to 'dashboard:navigate:coins'. No extra wiring here.
 
+  // Prefetch engagement-related queries & trigger components to refetch when navigating to engagement section
+  useEffect(() => {
+    const handler = () => {
+      const startDate = filters.fromISO
+      const endDate = filters.toISO
+      try {
+        // Prefetch feature breakdown (default cohort all)
+        queryClient.prefetchQuery({
+          queryKey: ['engagement-feature-breakdown', startDate, endDate, 'all'],
+          queryFn: () => engagementApi.getFeatureBreakdown({ startDate, endDate, cohort: 'all' })
+        })
+      } catch (e) { console.warn('[Dashboard] Prefetch feature-breakdown failed', e) }
+      try {
+        // Prefetch top characters (metric coins_spent, limit 10)
+        queryClient.prefetchQuery({
+          queryKey: ['engagement-top-characters', startDate, endDate, 10],
+          queryFn: () => engagementApi.getTopCharacters({ startDate, endDate, metric: 'coins_spent', limit: 10 })
+        })
+      } catch (e) { console.warn('[Dashboard] Prefetch top-characters failed', e) }
+      try {
+        // Prefetch top active users (metric coins_spent, feature all) – guard if fn not present
+        if (typeof engagementApi.getTopActiveUsers === 'function') {
+          queryClient.prefetchQuery({
+            queryKey: ['engagement-top-active-users', startDate, endDate, 'coins_spent', 'all'],
+            queryFn: () => engagementApi.getTopActiveUsers({ startDate, endDate, metric: 'coins_spent', feature: 'all', limit: 20 })
+          })
+        } else {
+          console.warn('[Dashboard] engagementApi.getTopActiveUsers missing; skip prefetch')
+        }
+      } catch (e) { console.warn('[Dashboard] Prefetch top-active-users failed', e) }
+      // Notify components to refresh using their current local controls
+      window.dispatchEvent(new CustomEvent('dashboard:engagement:refetch'))
+    }
+    window.addEventListener('dashboard:navigate:engagement', handler)
+    return () => window.removeEventListener('dashboard:navigate:engagement', handler)
+  }, [filters.fromISO, filters.toISO, queryClient])
+
   const formatCurrency = (v, cur='USD') => new Intl.NumberFormat('en-US',{style:'currency',currency:cur}).format(v||0)
   const formatPercent = v => `${(v||0).toFixed(1)}%`
   const pctChange = (curr, prev) => (prev ? ((curr - prev)/prev)*100 : 0)
@@ -142,9 +183,15 @@ export default function Dashboard() {
         </section>
       </AnchorSection>
       <AnchorSection id="engagement" title="Engagement & Usage">
-        <Placeholder id="top-active" title="Top Active Users" />
-        <Placeholder id="feature-engagement" title="Feature Engagement Breakdown" />
-        <Placeholder id="top-characters" title="Top Characters" />
+        <section id="top-active" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <TopActiveUsersTable />
+        </section>
+        <section id="feature-engagement" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <FeatureEngagementBreakdown />
+        </section>
+        <section id="top-characters" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <TopCharacters limit={10} />
+        </section>
       </AnchorSection>
       <AnchorSection id="promotions" title="Promotions & Marketing">
         <Placeholder id="promotions-performance" title="Promotions Performance" />
