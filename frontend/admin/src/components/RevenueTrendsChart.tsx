@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   AreaChart,
@@ -11,7 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { ToggleGroup, ToggleGroupItem } from './ui/toggle-group'
-import { useFilters } from '../contexts/FiltersContext'
+import { useFilters } from '../context/FiltersContext'
 import { SectionCard } from './SectionCard'
 import { formatCurrency, downloadCSV, toCSV } from '../lib/utils'
 
@@ -29,12 +29,7 @@ interface RevenueTrendsResponse {
 }
 
 // Mock API call
-const fetchRevenueTrends = async (
-  startDate: string,
-  endDate: string,
-  interval: string,
-  currency: string
-): Promise<RevenueTrendsResponse> => {
+const fetchRevenueTrends = async (): Promise<RevenueTrendsResponse> => {
   await new Promise(resolve => setTimeout(resolve, 1200))
   
   // Generate mock data based on interval
@@ -58,12 +53,12 @@ export function RevenueTrendsChart() {
   const { filters } = useFilters()
   const [visibleSeries, setVisibleSeries] = useState(['subscription_revenue', 'coin_revenue'])
   
-  const startDate = filters.dateRange?.from?.toISOString().split('T')[0] || ''
-  const endDate = filters.dateRange?.to?.toISOString().split('T')[0] || ''
+  const startDate = filters.fromISO
+  const endDate = filters.toISO
   
   const { data, isLoading, error } = useQuery({
-    queryKey: ['revenue-trends', startDate, endDate, filters.interval, filters.currency],
-    queryFn: () => fetchRevenueTrends(startDate, endDate, filters.interval, filters.currency),
+    queryKey: ['revenue-trends', startDate, endDate, filters.interval],
+    queryFn: () => fetchRevenueTrends(),
     enabled: !!startDate && !!endDate,
   })
 
@@ -74,13 +69,7 @@ export function RevenueTrendsChart() {
     }
   }
 
-  const toggleSeries = (series: string) => {
-    setVisibleSeries(prev => 
-      prev.includes(series) 
-        ? prev.filter(s => s !== series)
-        : [...prev, series]
-    )
-  }
+  // toggleSeries logic inlined by using setVisibleSeries directly where needed
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
@@ -89,7 +78,7 @@ export function RevenueTrendsChart() {
           <p className="font-medium">{label}</p>
           {payload.map((entry: any, index: number) => (
             <p key={index} style={{ color: entry.color }}>
-              {entry.name}: {formatCurrency(entry.value, filters.currency)}
+              {entry.name}: {formatCurrency(entry.value, 'USD')}
             </p>
           ))}
         </div>
@@ -135,7 +124,7 @@ export function RevenueTrendsChart() {
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis dataKey="period" className="text-xs" />
             <YAxis 
-              tickFormatter={(value) => formatCurrency(value, filters.currency)} 
+              tickFormatter={(value) => formatCurrency(value, 'USD')} 
               className="text-xs"
             />
             <Tooltip content={<CustomTooltip />} />
@@ -170,13 +159,13 @@ export function RevenueTrendsChart() {
           <div className="text-center">
             <p className="text-sm text-muted-foreground">Total Revenue (All Periods)</p>
             <p className="text-2xl font-bold">
-              {formatCurrency(data.total_revenue_all_periods, filters.currency)}
+              {formatCurrency(data.total_revenue_all_periods, 'USD')}
             </p>
           </div>
           <div className="text-center">
             <p className="text-sm text-muted-foreground">Average Monthly Revenue</p>
             <p className="text-2xl font-bold">
-              {formatCurrency(data.avg_monthly_revenue, filters.currency)}
+              {formatCurrency(data.avg_monthly_revenue, 'USD')}
             </p>
           </div>
         </div>

@@ -4,12 +4,10 @@ import {
   CreditCard, 
   Coins, 
   Users, 
-  TrendingUp,
-  BarChart3
+  TrendingUp
 } from 'lucide-react'
 import { cn } from '../lib/utils'
-import { FiltersProvider } from '../contexts/FiltersContext'
-import { FilterBar } from '../components/FilterBar'
+import { FiltersProvider } from '../context/FiltersContext'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -65,7 +63,7 @@ function Sidebar() {
   return (
     <div className="w-64 h-full bg-card border-r border-border">
       <div className="p-6">
-        <h2 className="text-lg font-semibold text-foreground">Analytics Dashboard</h2>
+        <h1 className="text-lg font-semibold text-foreground">Analytics Dashboard</h1>
       </div>
       <nav className="px-4 space-y-2">
         {sidebarSections.map((section) => (
@@ -99,7 +97,6 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
         <div className="flex h-screen">
           <Sidebar />
           <div className="flex-1 flex flex-col overflow-hidden">
-            <FilterBar />
             <main className="flex-1 overflow-auto p-6">
               {children}
             </main>

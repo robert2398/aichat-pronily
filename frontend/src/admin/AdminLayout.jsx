@@ -2,7 +2,7 @@ import React, { Suspense, useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import { Sidebar } from '../../admin/src/components/Sidebar';
 import { DateRangeProvider } from '../../admin/src/contexts/DateRangeContext';
-import { FiltersProvider } from '../../admin/src/contexts/FiltersContext';
+import { FiltersProvider } from '../../admin/src/context/FiltersContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const adminQueryClient = new QueryClient({
@@ -20,13 +20,12 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-[#f8fafc] text-black">
       <QueryClientProvider client={adminQueryClient}>
         <DateRangeProvider>
-        <FiltersProvider>
-        {/* Sidebar from admin app. It expects props isOpen and onClose. */}
+  <FiltersProvider>
+        {/* Sidebar */}
         <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
-
-        {/* Main content shifted to the right to account for sidebar width */}
-        <main style={{ paddingTop: 16, marginLeft: isOpen ? 288 : 0, transition: 'margin-left 0.3s' }}>
-          <div className="mx-auto max-w-7xl px-4 py-3">
+  {/* Main content (FilterBar moved inside specific pages e.g. Dashboard) */}
+  <main style={{ paddingTop: 16, marginLeft: isOpen ? 288 : 0, transition: 'margin-left 0.3s' }}>
+          <div className="mx-auto max-w-7xl px-4 pb-6">
             <Suspense fallback={<div>Loading admin...</div>}>
               <Outlet />
             </Suspense>

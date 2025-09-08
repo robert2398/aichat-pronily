@@ -16,7 +16,6 @@ export interface Filters {
   interval: Interval
   feature: Feature
   plan: string
-  currency: 'USD'
 }
 
 const DEFAULT_PRESET: DatePreset = '30d'
@@ -25,7 +24,6 @@ const DEFAULT_FILTERS: Omit<Filters, 'fromISO' | 'toISO'> & { fromISO?: string; 
   interval: 'monthly',
   feature: 'all',
   plan: 'all',
-  currency: 'USD',
 }
 
 /** Format Date -> YYYY-MM-DD */
@@ -77,7 +75,6 @@ function readInitial(search: URLSearchParams): Filters {
   const intervalParam = search.get('interval') as Interval | null
   const featureParam = search.get('feature') as Feature | null
   const planParam = search.get('plan')
-  const currencyParam = search.get('currency') as 'USD' | null
   const fromParam = search.get('from')
   const toParam = search.get('to')
 
@@ -102,7 +99,6 @@ function readInitial(search: URLSearchParams): Filters {
   if (intervalParam && VALID_INTERVALS.includes(intervalParam)) base.interval = intervalParam
   if (featureParam && VALID_FEATURES.includes(featureParam)) base.feature = featureParam
   if (planParam) base.plan = planParam
-  if (currencyParam === 'USD') base.currency = 'USD'
   return base
 }
 
@@ -114,7 +110,6 @@ function writeSearchParams(filters: Filters, setSearchParams: (next: URLSearchPa
   sp.set('interval', filters.interval)
   sp.set('feature', filters.feature)
   sp.set('plan', filters.plan)
-  sp.set('currency', filters.currency)
   setSearchParams(sp, { replace: true })
 }
 

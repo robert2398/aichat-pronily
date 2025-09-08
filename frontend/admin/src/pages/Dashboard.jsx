@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useFilters } from '../contexts/FiltersContext'
+import { useFilters } from '../context/FiltersContext'
+import { FilterBar } from '../components/dashboard/FilterBar'
 import { apiService } from '../services/api'
 import { useScrollToHashOnMount } from '../hooks/useScrollToHashOnMount'
 
@@ -18,9 +19,9 @@ export default function Dashboard() {
       try {
         setLoading(true)
         setError(null)
-        const asOfDate = (filters?.dateRange?.to || new Date()).toISOString().split('T')[0]
-        console.log('[Dashboard] Fetch KPIs with', { asOfDate, interval: filters.interval })
-        const data = await apiService.getKpiMetrics({ asOfDate, period: 'monthly' })
+  const asOfDate = filters.toISO
+  console.log('[Dashboard] Fetch KPIs with', { asOfDate, interval: filters.interval })
+  const data = await apiService.getKpiMetrics({ asOfDate, period: filters.interval || 'monthly' })
         console.log('[Dashboard] KPI response:', data)
         setKpis(data)
       } catch (e) {
@@ -32,23 +33,16 @@ export default function Dashboard() {
     }
     load()
     // re-run if date range changes
-  }, [filters.dateRange?.to, filters.interval])
+  }, [filters.toISO, filters.interval])
 
   const formatCurrency = (v, cur='USD') => new Intl.NumberFormat('en-US',{style:'currency',currency:cur}).format(v||0)
   const formatPercent = v => `${(v||0).toFixed(1)}%`
   const pctChange = (curr, prev) => (prev ? ((curr - prev)/prev)*100 : 0)
 
   return (
-    <div className="space-y-8">
-      <div className="bg-white rounded-lg shadow p-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Analytics Dashboard</h1>
-        <p className="text-gray-600">Comprehensive monetization and engagement metrics</p>
-        <div className="mt-4 text-sm text-gray-500 flex flex-wrap gap-4">
-          <span>Interval: {filters.interval}</span>
-          <span>Feature: {filters.feature}</span>
-          <span>Currency: {filters.currency}</span>
-        </div>
-      </div>
+  <div className="space-y-8">
+      <FilterBar />
+      {/* Removed top hero section per request to reclaim vertical space */}
 
       <section id="kpis" className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">

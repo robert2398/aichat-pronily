@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { TrendingUp, TrendingDown } from 'lucide-react'
-import { useFilters } from '../contexts/FiltersContext'
+import { useFilters } from '../context/FiltersContext'
 import { SectionCard } from './SectionCard'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { formatCurrency, formatPercent } from '../lib/utils'
@@ -79,16 +79,16 @@ export function KpiStatCards() {
   console.log('🔍 KpiStatCards filters:', filters)
   
   const { data, isLoading, error } = useQuery({
-    queryKey: ['kpi-summary', filters.dateRange, filters.currency],
+    queryKey: ['kpi-summary', filters.toISO, filters.currency],
     queryFn: () => {
       console.log('🎯 React Query executing...')
       return fetchKpiData({
-        asOfDate: filters.dateRange?.to?.toISOString().split('T')[0],
-        period: 'monthly'
+        asOfDate: filters.toISO,
+        period: filters.interval || 'monthly'
       })
     },
-    enabled: true, // Force enable for debugging
-    retry: false, // Disable retry for debugging
+    enabled: !!filters.toISO,
+    retry: false,
   })
 
   console.log('📊 Query state:', { data, isLoading, error })

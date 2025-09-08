@@ -503,7 +503,7 @@ async def promotions_performance(
 @router.get("/metrics/summary", dependencies=[Depends(require_admin)])
 async def metrics_summary(
     as_of_date: Optional[str] = Query(None),
-    period: Optional[str] = Query('monthly'),
+    interval: Optional[str] = Query('monthly'),
     cohort: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db),
 ):

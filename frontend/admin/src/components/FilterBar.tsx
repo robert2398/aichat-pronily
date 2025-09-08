@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Calendar, Download } from 'lucide-react'
 import { format } from 'date-fns'
 
-import { useFilters } from '../contexts/FiltersContext'
+import { useFilters } from '../context/FiltersContext'
 import { Button } from './ui/button'
 import {
   Select,
