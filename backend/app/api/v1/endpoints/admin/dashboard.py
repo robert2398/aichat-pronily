@@ -1,7 +1,8 @@
 from typing import Optional, List
+from datetime import datetime, date, timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, select, cast, Date, text
+from sqlalchemy import func, select, cast, Date, text, case
 
 from app.api.v1.deps import get_db, require_admin
 from app.models.subscription import (
@@ -18,6 +19,19 @@ def _date_range_defaults(start_date: Optional[str], end_date: Optional[str]):
     return start_date, end_date
 
 
+def _parse_datetime(s: Optional[str]):
+    """Parse an ISO or YYYY-MM-DD date string into a datetime (or None)."""
+    if not s:
+        return None
+    try:
+        return datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except Exception:
+        try:
+            return datetime.strptime(s, "%Y-%m-%d")
+        except Exception:
+            return None
+
+
 @router.get("/coins/purchases-summary", dependencies=[Depends(require_admin)])
 async def coins_purchases_summary(
     start_date: Optional[str] = Query(None),
@@ -27,20 +41,37 @@ async def coins_purchases_summary(
 ):
     """Aggregated coin purchase data."""
     # overall totals from coin_purchases table
-    start_date, end_date = _date_range_defaults(start_date, end_date)
+    # keep the raw strings for returning in the response, but parse into
+    # datetime objects so asyncpg receives proper timestamp/date params
+    start_date_raw, end_date_raw = _date_range_defaults(start_date, end_date)
+
+    def _parse_dt(s: Optional[str]):
+        if not s:
+            return None
+        try:
+            # accept YYYY-MM-DD or full ISO (with optional Z)
+            return datetime.fromisoformat(s.replace("Z", "+00:00"))
+        except Exception:
+            try:
+                return datetime.strptime(s, "%Y-%m-%d")
+            except Exception:
+                return None
+
+    start_dt = _parse_dt(start_date_raw)
+    end_dt = _parse_dt(end_date_raw)
 
     q = select(func.count(CoinPurchase.id).label("total_purchase_transactions"), func.coalesce(func.sum(CoinPurchase.coin_reward), 0).label("total_coins_purchased"))
-    if start_date:
-        q = q.where(CoinPurchase.created_at >= start_date)
-    if end_date:
-        q = q.where(CoinPurchase.created_at <= end_date)
+    if start_dt:
+        q = q.where(CoinPurchase.created_at >= start_dt)
+    if end_dt:
+        q = q.where(CoinPurchase.created_at <= end_dt)
 
     result = await db.execute(q)
     totals = result.first() or (0, 0)
 
     response = {
-        "start_date": start_date,
-        "end_date": end_date,
+        "start_date": start_date_raw,
+        "end_date": end_date_raw,
         "total_purchase_transactions": int(totals[0] or 0),
         "total_coins_purchased": int(totals[1] or 0),
     }
@@ -56,10 +87,10 @@ async def coins_purchases_summary(
             label = func.to_char(CoinPurchase.created_at, 'IYYY-"W"IW')
 
         breakdown_q = select(label.label("date"), func.coalesce(func.sum(CoinPurchase.coin_reward), 0).label("coins_purchased"))
-        if start_date:
-            breakdown_q = breakdown_q.where(CoinPurchase.created_at >= start_date)
-        if end_date:
-            breakdown_q = breakdown_q.where(CoinPurchase.created_at <= end_date)
+        if start_dt:
+            breakdown_q = breakdown_q.where(CoinPurchase.created_at >= start_dt)
+        if end_dt:
+            breakdown_q = breakdown_q.where(CoinPurchase.created_at <= end_dt)
         breakdown_q = breakdown_q.group_by(label).order_by(label)
 
         rows = await db.execute(breakdown_q)
@@ -77,13 +108,17 @@ async def coins_usage_by_feature(
     db: AsyncSession = Depends(get_db),
 ):
     """Coins spent by feature."""
+    # parse date strings into datetimes for DB comparison
+    start_dt = _parse_datetime(start_date)
+    end_dt = _parse_datetime(end_date)
+
     q = select(func.coalesce(func.sum(CoinTransaction.coins), 0)).label("total")
     # base total
     total_q = select(func.coalesce(func.sum(CoinTransaction.coins), 0).label("total_coins_spent"))
-    if start_date:
-        total_q = total_q.where(CoinTransaction.created_at >= start_date)
-    if end_date:
-        total_q = total_q.where(CoinTransaction.created_at <= end_date)
+    if start_dt:
+        total_q = total_q.where(CoinTransaction.created_at >= start_dt)
+    if end_dt:
+        total_q = total_q.where(CoinTransaction.created_at <= end_dt)
     if feature:
         total_q = total_q.where(CoinTransaction.source_type == feature)
 
@@ -91,10 +126,10 @@ async def coins_usage_by_feature(
     total_coins = int((total_row.scalar()) or 0)
 
     by_feature_q = select(CoinTransaction.source_type.label("feature"), func.coalesce(func.sum(CoinTransaction.coins), 0).label("coins_spent"))
-    if start_date:
-        by_feature_q = by_feature_q.where(CoinTransaction.created_at >= start_date)
-    if end_date:
-        by_feature_q = by_feature_q.where(CoinTransaction.created_at <= end_date)
+    if start_dt:
+        by_feature_q = by_feature_q.where(CoinTransaction.created_at >= start_dt)
+    if end_dt:
+        by_feature_q = by_feature_q.where(CoinTransaction.created_at <= end_dt)
     if feature:
         by_feature_q = by_feature_q.where(CoinTransaction.source_type == feature)
     by_feature_q = by_feature_q.group_by(CoinTransaction.source_type).order_by(func.sum(CoinTransaction.coins).desc())
@@ -149,40 +184,133 @@ async def subscriptions_plan_summary(
 async def subscriptions_history(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
-    metric: Optional[str] = Query('active_count'),  # active_count, new_subscriptions, cancellations
-    interval: Optional[str] = Query('monthly'),
+    metric: Optional[str] = Query("active_count"),  # active_count, new_subscriptions, cancellations
+    interval: Optional[str] = Query("monthly"),     # monthly | quarterly
     db: AsyncSession = Depends(get_db),
 ):
-    """Historical subscription metrics over time."""
-    # For simplicity implement monthly active_count and new_subscriptions
-    if interval != 'monthly':
-        # fallback to monthly for now
-        interval = 'monthly'
+    """
+    Historical subscription metrics over time.
 
-    if metric == 'active_count':
-        # Count subscriptions active at end of each month in period using a generate_series helper (Postgres)
+    - metric=active_count        : number of active subscriptions at the END of each period
+    - metric=new_subscriptions   : count of subscriptions that STARTED within each period
+    - metric=cancellations       : count of subscriptions that ENDED within each period (status='canceled')
+    - interval                   : 'monthly' (default) or 'quarterly'
+    - start_date / end_date      : ISO date strings; defaults to last 12 months aligned to interval start
+    """
+
+    # ---- validate inputs ----
+    metric = (metric or "active_count").lower()
+    if metric not in {"active_count", "new_subscriptions", "cancellations"}:
+        metric = "active_count"
+
+    interval = (interval or "monthly").lower()
+    if interval not in {"monthly", "quarterly"}:
+        interval = "monthly"
+
+    # ---- parse & default dates ----
+    def _to_date(s: Optional[str]) -> Optional[date]:
+        if not s:
+            return None
+        try:
+            # Accept 'YYYY-MM-DD' or full ISO; ignore time part
+            return datetime.fromisoformat(s.replace("Z", "+00:00")).date()
+        except Exception:
+            return None
+
+    start_dt = _to_date(start_date)
+    end_dt = _to_date(end_date) or date.today()
+
+    if not start_dt:
+        # default: last 12 months from end_dt (inclusive)
+        start_dt = end_dt - timedelta(days=365)
+
+    # ---- align to period boundaries ----
+    def _month_start(d: date) -> date:
+        return d.replace(day=1)
+
+    def _quarter_start(d: date) -> date:
+        q_month = ((d.month - 1) // 3) * 3 + 1
+        return date(d.year, q_month, 1)
+
+    if interval == "monthly":
+        start_dt = _month_start(start_dt)
+        end_dt = _month_start(end_dt)
+        step_sql = "interval '1 month'"
+        label_sql = "to_char(p.period_start, 'YYYY-MM')"
+        trunc_unit = "month"
+    else:  # quarterly
+        start_dt = _quarter_start(start_dt)
+        end_dt = _quarter_start(end_dt)
+        step_sql = "interval '3 month'"
+        label_sql = "to_char(p.period_start, 'YYYY-\"Q\"Q')"
+        trunc_unit = "quarter"
+
+    # ---- SQL templates (Postgres) ----
+    # We build a periods CTE with period_start and next_period_start (boundary moment).
+    # Then left join to subscriptions with the metric-specific predicate.
+    base_cte = f"""
+            WITH periods AS (
+                SELECT gs::date AS period_start,
+                             (date_trunc('{trunc_unit}', gs)::date
+                                + {"interval '1 month'" if interval == 'monthly' else "interval '3 month'"}) AS next_period_start
+                FROM generate_series(cast(:start_date as date), cast(:end_date as date), {step_sql}) AS gs
+            )
+    """
+
+    if metric == "active_count":
+        # Active at end of period = active at next_period_start instant
         sql = text(
-            '''
-            SELECT to_char(date_trunc('month', months.generated_month), 'YYYY-MM') AS period,
-                   count(s.*) AS value
-            FROM (
-                SELECT generate_series(:start_date::date, :end_date::date, interval '1 month') AS generated_month
-            ) months
+            base_cte
+            + f"""
+            SELECT {label_sql} AS period,
+                   COUNT(s.*) AS value
+            FROM periods p
             LEFT JOIN subscriptions s
-              ON date_trunc('month', s.start_date) <= months.generated_month
-             AND (s.current_period_end IS NULL OR s.current_period_end >= months.generated_month)
+              ON s.start_date < p.next_period_start
+             AND (s.current_period_end IS NULL OR s.current_period_end >= p.next_period_start)
             GROUP BY period
             ORDER BY period
-            '''
+            """
         )
-        params = {"start_date": start_date or '2024-01-01', "end_date": end_date or '2025-12-01'}
-        rows = await db.execute(sql, params)
-        history = [{"period": r[0], "value": int(r[1])} for r in rows]
-        return {"metric": metric, "interval": interval, "history": history}
 
-    # other metrics not implemented fully, return empty
-    return {"metric": metric, "interval": interval, "history": []}
+    elif metric == "new_subscriptions":
+        # Started within the period
+        sql = text(
+            base_cte
+            + f"""
+            SELECT {label_sql} AS period,
+                   COUNT(s.*) AS value
+            FROM periods p
+            LEFT JOIN subscriptions s
+              ON date_trunc('{trunc_unit}', s.start_date) = p.period_start
+            GROUP BY period
+            ORDER BY period
+            """
+        )
 
+    else:  # cancellations
+        # Ended within the period (status='canceled' and ended in that bucket)
+        # If you have a dedicated `canceled_at`, prefer that column. We use current_period_end here.
+        sql = text(
+            base_cte
+            + f"""
+            SELECT {label_sql} AS period,
+                   COUNT(s.*) AS value
+            FROM periods p
+            LEFT JOIN subscriptions s
+              ON s.status = 'canceled'
+             AND s.current_period_end IS NOT NULL
+             AND date_trunc('{trunc_unit}', s.current_period_end) = p.period_start
+            GROUP BY period
+            ORDER BY period
+            """
+        )
+
+    params = {"start_date": start_dt, "end_date": end_dt}
+    rows = await db.execute(sql, params)
+    history = [{"period": r[0], "value": int(r[1] or 0)} for r in rows]
+
+    return {"metric": metric, "interval": interval, "history": history}
 
 @router.get("/users/lifetime-value", dependencies=[Depends(require_admin)])
 async def users_lifetime_value(
@@ -239,21 +367,46 @@ async def revenue_trends(
     segment: Optional[str] = Query('all'),  # all, subscription, coins
     db: AsyncSession = Depends(get_db),
 ):
-    """Revenue trends combining orders (subscription) and coin purchases."""
-    # monthly aggregation from orders and coin_purchases
-    # subscription revenue from orders.subtotal_at_apply when subscription_id is not null
-    sub_q = select(func.to_char(Order.applied_at, 'YYYY-MM').label('period'), func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('subscription_revenue')).where(Order.subscription_id != None)
-    coin_q = select(func.to_char(Order.applied_at, 'YYYY-MM').label('period'), func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('coin_revenue')).where(Order.subscription_id == None)
+    """Revenue trends combining orders and coin purchases.
 
-    if start_date:
-        sub_q = sub_q.where(Order.applied_at >= start_date)
-        coin_q = coin_q.where(Order.applied_at >= start_date)
-    if end_date:
-        sub_q = sub_q.where(Order.applied_at <= end_date)
-        coin_q = coin_q.where(Order.applied_at <= end_date)
+    Fixes:
+    - Parse start_date/end_date strings into datetimes to avoid Postgres comparing
+      timestamp columns against varchar parameters.
+    - Support daily/monthly interval period formatting.
+    """
+    # choose period label based on interval
+    if interval == 'daily':
+        period_expr = func.to_char(Order.applied_at, 'YYYY-MM-DD').label('period')
+    else:
+        # default to monthly
+        period_expr = func.to_char(Order.applied_at, 'YYYY-MM').label('period')
 
-    sub_q = sub_q.group_by(text('period')).order_by(text('period'))
-    coin_q = coin_q.group_by(text('period')).order_by(text('period'))
+    # base queries
+    sub_q = select(period_expr, func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('subscription_revenue')).where(Order.subscription_id != None)
+    coin_q = select(period_expr, func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('coin_revenue')).where(Order.subscription_id == None)
+
+    # parse ISO date strings into datetimes so SQLAlchemy/asyncpg send proper timestamp/date params
+    start_dt = None
+    end_dt = None
+    try:
+        if start_date:
+            start_dt = datetime.fromisoformat(start_date)
+        if end_date:
+            end_dt = datetime.fromisoformat(end_date)
+    except Exception:
+        # leave as None; DB-side validation/empty results are acceptable
+        start_dt = None
+        end_dt = None
+
+    if start_dt:
+        sub_q = sub_q.where(Order.applied_at >= start_dt)
+        coin_q = coin_q.where(Order.applied_at >= start_dt)
+    if end_dt:
+        sub_q = sub_q.where(Order.applied_at <= end_dt)
+        coin_q = coin_q.where(Order.applied_at <= end_dt)
+
+    sub_q = sub_q.group_by(period_expr).order_by(period_expr)
+    coin_q = coin_q.group_by(period_expr).order_by(period_expr)
 
     sub_rows = await db.execute(sub_q)
     coin_rows = await db.execute(coin_q)
@@ -286,11 +439,18 @@ async def coins_trends(
     """Coins purchased vs spent over time (simple weekly/monthly grouping)."""
     # use coin_transactions table for spent and purchases (transaction_type)
     period_label = func.to_char(CoinTransaction.created_at, 'IYYY-"W"IW') if interval == 'weekly' else func.to_char(CoinTransaction.created_at, 'YYYY-MM')
-    q = select(period_label.label('period'), func.coalesce(func.sum(func.case([(CoinTransaction.transaction_type == 'credit', CoinTransaction.coins)], else_=0)), 0).label('coins_purchased'), func.coalesce(func.sum(func.case([(CoinTransaction.transaction_type == 'debit', CoinTransaction.coins)], else_=0)), 0).label('coins_spent'))
-    if start_date:
-        q = q.where(CoinTransaction.created_at >= start_date)
-    if end_date:
-        q = q.where(CoinTransaction.created_at <= end_date)
+    q = select(
+        period_label.label('period'),
+    func.coalesce(func.sum(case((CoinTransaction.transaction_type == 'credit', CoinTransaction.coins), else_=0)), 0).label('coins_purchased'),
+    func.coalesce(func.sum(case((CoinTransaction.transaction_type == 'debit', CoinTransaction.coins), else_=0)), 0).label('coins_spent')
+    )
+    # parse date strings
+    start_dt = _parse_datetime(start_date)
+    end_dt = _parse_datetime(end_date)
+    if start_dt:
+        q = q.where(CoinTransaction.created_at >= start_dt)
+    if end_dt:
+        q = q.where(CoinTransaction.created_at <= end_dt)
     if cohort:
         # no cohort mapping supported in schema; ignore
         pass
@@ -323,12 +483,16 @@ async def users_top_spenders(
 ):
     """Top spending users by revenue or coins."""
     # For revenue, sum orders.subtotal_at_apply per user; for coins, sum coin transactions debit coins
+    # parse dates
+    start_dt = _parse_datetime(start_date)
+    end_dt = _parse_datetime(end_date)
+
     if metric == 'coins':
         q = select(CoinTransaction.user_id.label('user_id'), func.coalesce(func.sum(CoinTransaction.coins), 0).label('coins_spent')).where(CoinTransaction.transaction_type == 'debit')
-        if start_date:
-            q = q.where(CoinTransaction.created_at >= start_date)
-        if end_date:
-            q = q.where(CoinTransaction.created_at <= end_date)
+        if start_dt:
+            q = q.where(CoinTransaction.created_at >= start_dt)
+        if end_dt:
+            q = q.where(CoinTransaction.created_at <= end_dt)
         q = q.group_by(CoinTransaction.user_id).order_by(func.sum(CoinTransaction.coins).desc()).limit(limit)
         rows = await db.execute(q)
         users = []
@@ -338,10 +502,10 @@ async def users_top_spenders(
 
     # revenue
     q = select(Order.user_id.label('user_id'), func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('total_revenue'))
-    if start_date:
-        q = q.where(Order.applied_at >= start_date)
-    if end_date:
-        q = q.where(Order.applied_at <= end_date)
+    if start_dt:
+        q = q.where(Order.applied_at >= start_dt)
+    if end_dt:
+        q = q.where(Order.applied_at <= end_dt)
     if plan:
         # join to subscriptions to filter by plan
         q = q.join(Subscription, Subscription.user_id == Order.user_id).where(Subscription.plan_name == plan)
@@ -351,10 +515,10 @@ async def users_top_spenders(
     for uid, rev in rows:
         # get coins counts for user in window
         coins_q = select(func.coalesce(func.sum(CoinTransaction.coins), 0).label('coins')).where(CoinTransaction.user_id == uid)
-        if start_date:
-            coins_q = coins_q.where(CoinTransaction.created_at >= start_date)
-        if end_date:
-            coins_q = coins_q.where(CoinTransaction.created_at <= end_date)
+        if start_dt:
+            coins_q = coins_q.where(CoinTransaction.created_at >= start_dt)
+        if end_dt:
+            coins_q = coins_q.where(CoinTransaction.created_at <= end_dt)
         coins_val = int((await db.execute(coins_q)).scalar() or 0)
         top.append({"user_id": int(uid), "subscription_plan": None, "total_revenue": float(rev or 0.0), "coins_purchased": coins_val, "coins_spent": coins_val})
 
@@ -371,13 +535,16 @@ async def users_top_active(
     db: AsyncSession = Depends(get_db),
 ):
     """Top active users by coins_spent or actions."""
+    start_dt = _parse_datetime(start_date)
+    end_dt = _parse_datetime(end_date)
+
     if metric == 'actions':
         # use count of coin transactions as proxy for actions
         q = select(CoinTransaction.user_id, func.count(CoinTransaction.id).label('total_actions'))
-        if start_date:
-            q = q.where(CoinTransaction.created_at >= start_date)
-        if end_date:
-            q = q.where(CoinTransaction.created_at <= end_date)
+        if start_dt:
+            q = q.where(CoinTransaction.created_at >= start_dt)
+        if end_dt:
+            q = q.where(CoinTransaction.created_at <= end_dt)
         if feature:
             q = q.where(CoinTransaction.source_type == feature)
         q = q.group_by(CoinTransaction.user_id).order_by(func.count(CoinTransaction.id).desc()).limit(limit)
@@ -385,16 +552,20 @@ async def users_top_active(
         out = []
         for uid, actions in rows:
             coins_q = select(func.coalesce(func.sum(CoinTransaction.coins), 0)).where(CoinTransaction.user_id == uid)
+            if start_dt:
+                coins_q = coins_q.where(CoinTransaction.created_at >= start_dt)
+            if end_dt:
+                coins_q = coins_q.where(CoinTransaction.created_at <= end_dt)
             coins_val = int((await db.execute(coins_q)).scalar() or 0)
             out.append({"user_id": int(uid), "total_actions": int(actions), "total_coins_spent": coins_val, "avg_coins_per_action": round(coins_val / int(actions) if actions else 0, 2)})
         return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_active_users": out}
 
     # default coins_spent
     q = select(CoinTransaction.user_id, func.coalesce(func.sum(CoinTransaction.coins), 0).label('total_coins_spent')).where(CoinTransaction.transaction_type == 'debit')
-    if start_date:
-        q = q.where(CoinTransaction.created_at >= start_date)
-    if end_date:
-        q = q.where(CoinTransaction.created_at <= end_date)
+    if start_dt:
+        q = q.where(CoinTransaction.created_at >= start_dt)
+    if end_dt:
+        q = q.where(CoinTransaction.created_at <= end_dt)
     if feature:
         q = q.where(CoinTransaction.source_type == feature)
     q = q.group_by(CoinTransaction.user_id).order_by(func.sum(CoinTransaction.coins).desc()).limit(limit)
@@ -402,6 +573,10 @@ async def users_top_active(
     out = []
     for uid, coins in rows:
         actions_q = select(func.count(CoinTransaction.id)).where(CoinTransaction.user_id == uid)
+        if start_dt:
+            actions_q = actions_q.where(CoinTransaction.created_at >= start_dt)
+        if end_dt:
+            actions_q = actions_q.where(CoinTransaction.created_at <= end_dt)
         actions_val = int((await db.execute(actions_q)).scalar() or 0)
         out.append({"user_id": int(uid), "total_actions": actions_val, "total_coins_spent": int(coins or 0), "avg_coins_per_action": round(int(coins or 0) / actions_val if actions_val else 0, 2)})
     return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_active_users": out}
@@ -416,11 +591,14 @@ async def engagement_feature_breakdown(
     db: AsyncSession = Depends(get_db),
 ):
     """Engagement metrics by feature."""
+    start_dt = _parse_datetime(start_date)
+    end_dt = _parse_datetime(end_date)
+
     q = select(CoinTransaction.source_type.label('feature'), func.count(CoinTransaction.id).label('total_actions'), func.count(func.distinct(CoinTransaction.user_id)).label('unique_users'), func.coalesce(func.sum(CoinTransaction.coins), 0).label('coins_spent'))
-    if start_date:
-        q = q.where(CoinTransaction.created_at >= start_date)
-    if end_date:
-        q = q.where(CoinTransaction.created_at <= end_date)
+    if start_dt:
+        q = q.where(CoinTransaction.created_at >= start_dt)
+    if end_dt:
+        q = q.where(CoinTransaction.created_at <= end_dt)
     q = q.group_by(CoinTransaction.source_type).order_by(func.count(CoinTransaction.id).desc())
     rows = await db.execute(q)
     features = []
@@ -445,12 +623,15 @@ async def engagement_top_characters(
     # assume character interactions are recorded in CoinTransaction with source_type 'character' and order_id linking to media or character id in other tables is not present
     # try to join CharacterMedia or Character if possible; fallback: group by source_identifier in CoinTransaction if present
     # For simplicity, we will aggregate by order_id which may include character id in some setups; otherwise return empty
+    start_dt = _parse_datetime(start_date)
+    end_dt = _parse_datetime(end_date)
+
     ct = CoinTransaction
     q = select(ct.order_id.label('character_id'), func.coalesce(func.sum(ct.coins), 0).label('coins_spent'), func.count(ct.id).label('interactions'), func.count(func.distinct(ct.user_id)).label('unique_users')).where(ct.source_type == 'character')
-    if start_date:
-        q = q.where(ct.created_at >= start_date)
-    if end_date:
-        q = q.where(ct.created_at <= end_date)
+    if start_dt:
+        q = q.where(ct.created_at >= start_dt)
+    if end_dt:
+        q = q.where(ct.created_at <= end_dt)
     q = q.group_by(ct.order_id).order_by(func.sum(ct.coins).desc()).limit(limit)
     rows = await db.execute(q)
     out = []
@@ -470,16 +651,27 @@ async def promotions_performance(
 ):
     """Promo performance metrics."""
     pm = PromoManagement
-    q = select(pm.coupon.label('promo_code'), pm.promo_name, func.coalesce(func.count(Order.id), 0).label('times_redeemed'), func.coalesce(func.sum(func.case([(Order.subscription_id == None, 1)], else_=0)), 0).label('coin_purchase_count'), func.coalesce(func.sum(func.case([(Order.subscription_id != None, 1)], else_=0)), 0).label('subscription_count'), func.coalesce(func.sum(Order.discount_applied), 0).label('total_discount_given'), func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('total_revenue_generated'))
+    q = select(
+        pm.coupon.label('promo_code'),
+        pm.promo_name,
+        func.coalesce(func.count(Order.id), 0).label('times_redeemed'),
+    func.coalesce(func.sum(case((Order.subscription_id == None, 1), else_=0)), 0).label('coin_purchase_count'),
+    func.coalesce(func.sum(case((Order.subscription_id != None, 1), else_=0)), 0).label('subscription_count'),
+        func.coalesce(func.sum(Order.discount_applied), 0).label('total_discount_given'),
+        func.coalesce(func.sum(Order.subtotal_at_apply), 0).label('total_revenue_generated'),
+    )
     q = q.join(Order, Order.promo_id == pm.id)
+    start_dt = _parse_datetime(start_date)
+    end_dt = _parse_datetime(end_date)
+
     if promo_code:
         q = q.where(pm.coupon.ilike(f"%{promo_code}%"))
     if status:
         q = q.where(pm.status == status)
-    if start_date:
-        q = q.where(Order.applied_at >= start_date)
-    if end_date:
-        q = q.where(Order.applied_at <= end_date)
+    if start_dt:
+        q = q.where(Order.applied_at >= start_dt)
+    if end_dt:
+        q = q.where(Order.applied_at <= end_dt)
     q = q.group_by(pm.coupon, pm.promo_name)
     rows = await db.execute(q)
     res = []

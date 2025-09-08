@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react'
 import { useFilters } from '../context/FiltersContext'
 import { FilterBar } from '../components/dashboard/FilterBar'
+import { RevenueTrendsChart } from '../components/RevenueTrendsChart'
+import { SubscriptionHistory } from '../components/SubscriptionHistory'
+import { SubscriptionPlanSummary } from '../components/SubscriptionPlanSummary'
+import { useQueryClient } from '@tanstack/react-query'
 import { apiService } from '../services/api'
 import { useScrollToHashOnMount } from '../hooks/useScrollToHashOnMount'
+import { CoinsPurchasedSummary } from '../components/CoinsPurchasedSummary'
+import { CoinsByFeature } from '../components/CoinsByFeature'
+import { CoinsPurchasedVsSpent } from '../components/CoinsPurchasedVsSpent'
 
 // IMPORTANT: Only ONE dashboard file now (.jsx). Removed .tsx duplicate so this file is what lazy() loads.
 
 export default function Dashboard() {
   const { filters } = useFilters()
+  const queryClient = useQueryClient()
   const [kpis, setKpis] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -34,6 +42,50 @@ export default function Dashboard() {
     load()
     // re-run if date range changes
   }, [filters.toISO, filters.interval])
+
+  // Refetch KPIs when user explicitly clicks Overview in sidebar
+  useEffect(() => {
+    const handler = () => {
+      (async () => {
+        try {
+          setLoading(true)
+          const asOfDate = filters.toISO
+          const data = await apiService.getKpiMetrics({ asOfDate, period: filters.interval || 'monthly' })
+          setKpis(data)
+        } catch (e) {
+          setError('Unable to load KPI metrics')
+        } finally {
+          setLoading(false)
+        }
+      })()
+    }
+    window.addEventListener('dashboard:navigate:overview', handler)
+    return () => window.removeEventListener('dashboard:navigate:overview', handler)
+  }, [filters.toISO, filters.interval])
+
+  // Prefetch subscription-related queries & trigger components to refetch when navigating to subscriptions section
+  useEffect(() => {
+    const handler = () => {
+      const startDate = filters.fromISO
+      const endDate = filters.toISO
+      // Prefetch plan summary
+      queryClient.prefetchQuery({
+        queryKey: ['subscription-plan-summary', filters.toISO],
+        queryFn: () => apiService.getSubscriptionPlanSummary({ asOfDate: filters.toISO })
+      })
+      // Prefetch subscription history for default metric/interval
+      queryClient.prefetchQuery({
+        queryKey: ['subscription-history', startDate, endDate, 'active_count', 'monthly'],
+        queryFn: () => apiService.getSubscriptionHistory({ startDate, endDate, metric: 'active_count', interval: 'monthly' })
+      })
+      // Dispatch internal events so child components can explicitly refetch with their current local state
+      window.dispatchEvent(new CustomEvent('dashboard:subscriptions:refetch'))
+    }
+    window.addEventListener('dashboard:navigate:subscriptions', handler)
+    return () => window.removeEventListener('dashboard:navigate:subscriptions', handler)
+  }, [filters.fromISO, filters.toISO, queryClient])
+
+  // When user clicks Coins in sidebar, components already listen to 'dashboard:navigate:coins'. No extra wiring here.
 
   const formatCurrency = (v, cur='USD') => new Intl.NumberFormat('en-US',{style:'currency',currency:cur}).format(v||0)
   const formatPercent = v => `${(v||0).toFixed(1)}%`
@@ -66,16 +118,28 @@ export default function Dashboard() {
       </section>
 
       <AnchorSection id="monetization" title="Monetization Overview">
-        <Placeholder id="revenue-trends" title="Revenue Trends" />
+        <section id="revenue-trends" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <RevenueTrendsChart />
+        </section>
       </AnchorSection>
       <AnchorSection id="subscriptions" title="Subscriptions Overview">
-        <Placeholder id="subscription-plans" title="Subscription Plan Summary" />
-        <Placeholder id="subscription-history" title="Subscription History" />
+        <section id="subscription-plans" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <SubscriptionPlanSummary />
+        </section>
+        <section id="subscription-history" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <SubscriptionHistory />
+        </section>
       </AnchorSection>
       <AnchorSection id="coins" title="Coins & Virtual Currency">
-        <Placeholder id="coins-purchased" title="Coins Purchased Summary" />
-        <Placeholder id="coins-by-feature" title="Coins Usage by Feature" />
-        <Placeholder id="coins-trends" title="Coins Purchase vs Spend Trends" />
+        <section id="coins-purchased" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <CoinsPurchasedSummary />
+        </section>
+        <section id="coins-by-feature" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <CoinsByFeature />
+        </section>
+        <section id="coins-trends" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <CoinsPurchasedVsSpent />
+        </section>
       </AnchorSection>
       <AnchorSection id="engagement" title="Engagement & Usage">
         <Placeholder id="top-active" title="Top Active Users" />

@@ -261,6 +261,24 @@ export interface Config {
   updated_at: string;
 }
 
+// Subscription Plan Summary types
+export interface SubscriptionPlanRow {
+  plan_name: string;
+  monthly_price: number | null; // may be null if not provided
+  active_subscribers: number;
+  retention_rate: number | null; // expect value 0-1 or percentage (backend unclear) – we'll normalize in component
+  churn_rate: number | null;     // same as above
+  avg_subscription_duration: number | null; // months (assumed)
+}
+
+export interface SubscriptionPlanSummaryResponse {
+  as_of_date: string | null;
+  total_active_subscribers: number;
+  plans: SubscriptionPlanRow[];
+  highest_retention_plan?: string | null;
+  highest_churn_plan?: string | null; // not in sample but useful; component can derive if absent
+}
+
 class APIService {
   private api: AxiosInstance;
   // ...existing code...
@@ -808,6 +826,140 @@ class APIService {
       console.error('❌ API Service: Error fetching KPI metrics:', error);
       throw error;
     }
+  }
+
+  /**
+   * Revenue trends (stacked subscription vs coin revenue) over time.
+   * GET /admin/dashboard/revenue/trends
+   * Query params: start_date, end_date, interval (daily|weekly|monthly|quarterly), currency
+   */
+  async getRevenueTrends(params: {
+    startDate: string;
+    endDate: string;
+    interval?: string; // optional; defaults to monthly if undefined
+  }): Promise<{
+    data: Array<{
+      period: string;
+      subscription_revenue: number;
+      coin_revenue: number;
+      total_revenue: number;
+    }>;
+    total_revenue_all_periods: number;
+    avg_monthly_revenue: number;
+  }> {
+    try {
+      const response = await this.api.get('/admin/dashboard/revenue/trends', {
+        params: {
+          start_date: params.startDate,
+          end_date: params.endDate,
+          interval: params.interval || 'monthly',
+        },
+      });
+      const raw = response.data as any;
+      const rows: any[] = Array.isArray(raw?.revenue_trends)
+        ? raw.revenue_trends
+        : Array.isArray(raw?.data)
+          ? raw.data
+          : [];
+      return {
+        data: rows.map(r => ({
+          period: r.period,
+          subscription_revenue: Number(r.subscription_revenue) || 0,
+            coin_revenue: Number(r.coin_revenue) || 0,
+          total_revenue: Number(r.total_revenue) || (Number(r.subscription_revenue)||0) + (Number(r.coin_revenue)||0),
+        })),
+        total_revenue_all_periods: Number(raw.total_revenue_all_periods) || rows.reduce((s, r) => s + ((Number(r.total_revenue) || (Number(r.subscription_revenue)||0)+(Number(r.coin_revenue)||0))), 0),
+        avg_monthly_revenue: Number(raw.avg_monthly_revenue) || 0,
+      };
+    } catch (e) {
+      console.error('[apiService.getRevenueTrends] failed', e);
+      throw e;
+    }
+  }
+
+  /**
+   * Fetch subscription plan summary metrics
+   * Primary admin endpoint: /admin/dashboard/subscriptions/plan-summary
+   * (Prompt also referenced /api/monetization/... – if that exists we could fall back to it.)
+   */
+  async getSubscriptionPlanSummary(params: { asOfDate?: string } = {}): Promise<SubscriptionPlanSummaryResponse> {
+    try {
+      const response = await this.api.get('/admin/dashboard/subscriptions/plan-summary', {
+        params: { as_of_date: params.asOfDate }
+      });
+      const raw = response.data as any;
+      const plans: SubscriptionPlanRow[] = Array.isArray(raw?.plans)
+        ? raw.plans.map((p: any) => ({
+            plan_name: p.plan_name,
+            monthly_price: p.monthly_price ?? null,
+            active_subscribers: Number(p.active_subscribers) || 0,
+            retention_rate: p.retention_rate === null || p.retention_rate === undefined ? null : Number(p.retention_rate),
+            churn_rate: p.churn_rate === null || p.churn_rate === undefined ? null : Number(p.churn_rate),
+            avg_subscription_duration: p.avg_subscription_duration === null || p.avg_subscription_duration === undefined ? null : Number(p.avg_subscription_duration),
+          }))
+        : [];
+
+      // Derive highest churn if backend doesn't send it
+      let highestChurn: string | null = raw?.highest_churn_plan ?? null;
+      if (!highestChurn && plans.length) {
+        const churnSorted = [...plans].filter(p => p.churn_rate !== null).sort((a,b) => (b.churn_rate||0) - (a.churn_rate||0));
+        highestChurn = churnSorted[0]?.plan_name || null;
+      }
+
+      return {
+        as_of_date: raw?.as_of_date ?? null,
+        total_active_subscribers: Number(raw?.total_active_subscribers) || plans.reduce((s,p)=>s+p.active_subscribers,0),
+        plans,
+        highest_retention_plan: raw?.highest_retention_plan ?? (plans.length ? [...plans].filter(p=>p.retention_rate!==null).sort((a,b)=>(b.retention_rate||0)-(a.retention_rate||0))[0]?.plan_name : null),
+        highest_churn_plan: highestChurn,
+      };
+    } catch (e) {
+      console.error('[apiService.getSubscriptionPlanSummary] failed', e);
+      throw e;
+    }
+  }
+
+  /**
+   * Subscription history time‑series.
+   * Primary (anticipated) admin endpoint: /admin/dashboard/subscriptions/history
+   * Prompt referenced raw base (/subscriptions/history) and /api/monetization/subscriptions/history – we'll try fallbacks.
+   * Query params: start_date, end_date, metric=(active_count|new_subscriptions|cancellations), interval=(monthly|quarterly)
+   */
+  async getSubscriptionHistory(params: {
+    startDate: string;
+    endDate: string;
+    metric: 'active_count' | 'new_subscriptions' | 'cancellations';
+    interval: 'monthly' | 'quarterly';
+  }): Promise<{ metric: string; interval: string; history: { period: string; value: number }[] }> {
+    const endpoints = [
+      '/admin/dashboard/subscriptions/history',
+      '/subscriptions/history',
+      '/api/monetization/subscriptions/history'
+    ];
+    const query = {
+      start_date: params.startDate,
+      end_date: params.endDate,
+      metric: params.metric,
+      interval: params.interval,
+    } as const;
+    let lastError: any = null;
+    for (const ep of endpoints) {
+      try {
+        const res = await this.api.get(ep, { params: query });
+        const raw = res.data as any;
+        const historyArr: any[] = Array.isArray(raw?.history) ? raw.history : Array.isArray(raw?.data) ? raw.data : [];
+        return {
+          metric: raw?.metric || params.metric,
+            interval: raw?.interval || params.interval,
+          history: historyArr.map(r => ({ period: String(r.period), value: Number(r.value) || 0 }))
+        };
+      } catch (e) {
+        lastError = e;
+        // try next endpoint
+      }
+    }
+    console.error('[apiService.getSubscriptionHistory] all endpoints failed', lastError);
+    throw lastError;
   }
 }
 

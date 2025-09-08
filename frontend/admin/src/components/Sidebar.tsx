@@ -207,11 +207,36 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ icon: Icon, open, forcedO
   };
 
   const toggleExpand = () => {
-    if (forcedOpen) return; // can't collapse while on dashboard route
-    setExpandedStored(v => !v);
+    // Repurposed: always navigate to overview and refresh KPIs; allow expand toggle only if not on dashboard route
+    if (!location.pathname.startsWith('/admin/dashboard')) {
+      navigate('/admin/dashboard');
+      try { window.dispatchEvent(new CustomEvent('dashboard:navigate:overview')); } catch {}
+      setExpandedStored(true);
+      return;
+    }
+    // Already on dashboard route: reset to overview (clear hash) and refresh
+    window.history.replaceState(null, '', '/admin/dashboard');
+    try { window.dispatchEvent(new CustomEvent('dashboard:navigate:overview')); } catch {}
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Don't collapse while on dashboard analytics (forcedOpen true)
+    if (!forcedOpen) {
+      setExpandedStored(v => !v);
+    }
   };
 
   const handleSubClick = (id: string) => {
+    // Dispatch global custom events so sections can eagerly refetch when navigated
+    try {
+      if (id === 'overview') {
+        window.dispatchEvent(new CustomEvent('dashboard:navigate:overview'))
+      } else if (id === 'monetization') {
+        window.dispatchEvent(new CustomEvent('dashboard:navigate:monetization'))
+      } else if (id === 'subscriptions') {
+        window.dispatchEvent(new CustomEvent('dashboard:navigate:subscriptions'))
+      } else if (id === 'coins') {
+        window.dispatchEvent(new CustomEvent('dashboard:navigate:coins'))
+      }
+    } catch { /* ignore */ }
     if (id === 'overview') {
       if (location.pathname.startsWith('/admin/dashboard')) {
         window.history.replaceState(null, '', '/admin/dashboard');
