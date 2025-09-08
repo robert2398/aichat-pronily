@@ -14,6 +14,9 @@ import { FeatureEngagementBreakdown } from '../components/FeatureEngagementBreak
 import { TopCharacters } from '../components/TopCharacters'
 import { TopActiveUsersTable } from '../components/TopActiveUsersTable'
 import { engagementApi } from '../services/engagementApi.ts'
+import { PromotionsPerformance } from '../components/PromotionsPerformance'
+import { TopSpendersTable } from '../components/TopSpendersTable'
+import { UserLtvPanel } from '../components/UserLtvPanel'
 
 // IMPORTANT: Only ONE dashboard file now (.jsx). Removed .tsx duplicate so this file is what lazy() loads.
 
@@ -23,6 +26,8 @@ export default function Dashboard() {
   const [kpis, setKpis] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [ltvOpen, setLtvOpen] = useState(false)
+  const [ltvUserId, setLtvUserId] = useState('')
   useScrollToHashOnMount()
 
   useEffect(() => {
@@ -128,6 +133,29 @@ export default function Dashboard() {
     return () => window.removeEventListener('dashboard:navigate:engagement', handler)
   }, [filters.fromISO, filters.toISO, queryClient])
 
+  // Prefetch promotions & marketing data when navigating to that section
+  useEffect(() => {
+    const handler = () => {
+      const startDate = filters.fromISO
+      const endDate = filters.toISO
+      try {
+        queryClient.prefetchQuery({
+          queryKey: ['promotions-performance', startDate, endDate, 'all'],
+          queryFn: () => import('../services/marketingApi').then(m => m.marketingApi.getPromotionsPerformance({ startDate, endDate, status: 'all' }))
+        })
+      } catch (e) { console.warn('[Dashboard] Prefetch promotions-performance failed', e) }
+      try {
+        queryClient.prefetchQuery({
+          queryKey: ['top-spenders', startDate, endDate, 'all'],
+          queryFn: () => import('../services/marketingApi').then(m => m.marketingApi.getTopSpenders({ startDate, endDate, limit: 20, metric: 'revenue', plan: 'all' }))
+        })
+      } catch (e) { console.warn('[Dashboard] Prefetch top-spenders failed', e) }
+      window.dispatchEvent(new CustomEvent('dashboard:promotions:refetch'))
+    }
+    window.addEventListener('dashboard:navigate:promotions', handler)
+    return () => window.removeEventListener('dashboard:navigate:promotions', handler)
+  }, [filters.fromISO, filters.toISO, queryClient])
+
   const formatCurrency = (v, cur='USD') => new Intl.NumberFormat('en-US',{style:'currency',currency:cur}).format(v||0)
   const formatPercent = v => `${(v||0).toFixed(1)}%`
   const pctChange = (curr, prev) => (prev ? ((curr - prev)/prev)*100 : 0)
@@ -194,8 +222,23 @@ export default function Dashboard() {
         </section>
       </AnchorSection>
       <AnchorSection id="promotions" title="Promotions & Marketing">
-        <Placeholder id="promotions-performance" title="Promotions Performance" />
-        <Placeholder id="top-spenders" title="Top Spenders" />
+        <section id="promotions-performance" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <PromotionsPerformance />
+        </section>
+        <section id="top-spenders" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <TopSpendersTable />
+        </section>
+        <section id="per-user-ltv" className="bg-white rounded-lg shadow p-4 md:p-6">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-lg font-semibold text-gray-900">Per-User LTV</h3>
+            <div className="flex items-center gap-2">
+              <input value={ltvUserId} onChange={(e)=>setLtvUserId(e.target.value)} placeholder="User ID" className="border rounded px-2 py-1 text-sm" style={{width:120}} />
+              <button className="bg-indigo-600 text-white text-sm px-3 py-1.5 rounded" onClick={()=>{ if(ltvUserId) setLtvOpen(true) }}>Open LTV</button>
+            </div>
+          </div>
+          <p className="text-sm text-gray-600">Open a detailed lifetime value panel for a specific user. Includes revenue split, coins metrics, and timeline link.</p>
+          <UserLtvPanel open={ltvOpen} onClose={()=>setLtvOpen(false)} userId={Number(ltvUserId||0)} />
+        </section>
       </AnchorSection>
     </div>
   )
