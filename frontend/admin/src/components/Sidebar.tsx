@@ -45,6 +45,8 @@ const navItems = [
   { label: 'User Management', id: 'users', path: '/admin/users', icon: PeopleIcon },
   { label: 'Pricing Management', id: 'pricing', path: '/admin/pricing', icon: PricingIcon },
   { label: 'Promo Management', id: 'promo', path: '/admin/promo', icon: TagIcon },
+  { label: 'Order History', id: 'orders', path: '/admin/orders', icon: PricingIcon },
+  { label: 'Coin Transactions', id: 'coin-transactions', path: '/admin/coin-transactions', icon: PricingIcon },
   { label: 'Content Moderation', id: 'content-moderation', path: '/admin/content-moderation', icon: SecurityIcon },
   { label: 'Character Management', id: 'characters', path: '/admin/characters', icon: PeopleIcon },
   { label: 'Push Notification', id: 'notification', path: '/admin/notification', icon: NotificationsIcon },

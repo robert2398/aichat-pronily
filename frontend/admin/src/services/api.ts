@@ -280,6 +280,36 @@ export interface SubscriptionPlanSummaryResponse {
 }
 
 class APIService {
+  // Fetch all coin transactions for admin
+  async getAllCoinTransactions(): Promise<any[]> {
+    try {
+  // Debug: log baseURL and endpoint for tracing
+  const configuredBase = (this.api && this.api.defaults && this.api.defaults.baseURL) || import.meta.env.VITE_API_BASE_URL || (typeof window !== 'undefined' ? `${window.location.origin}/api/v1` : '');
+  try { console.debug('[apiService] baseURL=', configuredBase); } catch {}
+  const endpoint = '/admin/pricing/all-coin-transactions';
+  const fullUrl = `${configuredBase.replace(/\/$/, '')}${endpoint}`;
+  console.debug('[apiService] calling GET', fullUrl);
+      // include auth header like the axios instance does
+      let headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      try {
+        const stored = typeof localStorage !== 'undefined' ? localStorage.getItem('pronily:auth:token') : null;
+        if (stored) {
+          const tokenOnly = stored.replace(/^bearer\s+/i, '').trim();
+          headers['Authorization'] = `bearer ${tokenOnly}`;
+        }
+      } catch (e) {
+        // ignore
+      }
+      console.debug('[apiService] GET headers=', Object.keys(headers));
+      // use axios directly with full URL to avoid any instance baseURL issues
+      const response = await axios.get<any[]>(fullUrl, { headers });
+  console.debug('[apiService] received response for coin transactions, status=', response.status);
+  return response.data;
+    } catch (error) {
+      console.error('Error fetching coin transactions:', error);
+      throw error;
+    }
+  }
   private api: AxiosInstance;
   // ...existing code...
 
@@ -958,8 +988,20 @@ class APIService {
         // try next endpoint
       }
     }
+
     console.error('[apiService.getSubscriptionHistory] all endpoints failed', lastError);
     throw lastError;
+  }
+
+  // Fetch all orders for promo/pricing history
+  async getAllOrders(): Promise<any[]> {
+    try {
+      const response = await this.api.get<any[]>('/admin/pricing/all-orders');
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      throw error;
+    }
   }
 }
 

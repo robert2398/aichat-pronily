@@ -59,6 +59,9 @@ const AdminPromo = lazy(() => import('../admin/src/pages/PromoManagement').then(
 const AdminContentModeration = lazy(() => import('../admin/src/pages/ContentModeration').then(mod => ({ default: mod.ContentModeration || mod.default })));
 const AdminAPIs = lazy(() => import('../admin/src/pages/APIsManagement').then(mod => ({ default: mod.APIsManagement || mod.default })));
 const AdminSettings = lazy(() => import('../admin/src/pages/Settings').then(mod => ({ default: mod.Settings || mod.default })));
+// Order history admin page
+const AdminOrders = lazy(() => import('../admin/src/pages/OrderHistory').then(mod => ({ default: mod.default || mod.OrderHistory })));
+const AdminCoinTransactions = lazy(() => import('../admin/src/pages/CoinTransactions').then(mod => ({ default: mod.default || mod.CoinTransactions })));
 import { useLocation } from "react-router-dom";
 
 export default function App() {
@@ -283,6 +286,8 @@ export default function App() {
           {/* subscriptions admin route removed */}
           <Route path="pricing" element={<Suspense fallback={<div>Loading...</div>}><AdminPricing /></Suspense>} />
           <Route path="promo" element={<Suspense fallback={<div>Loading...</div>}><AdminPromo /></Suspense>} />
+          <Route path="orders" element={<Suspense fallback={<div>Loading...</div>}><AdminOrders /></Suspense>} />
+          <Route path="coin-transactions" element={<Suspense fallback={<div>Loading...</div>}><AdminCoinTransactions /></Suspense>} />
           <Route path="content-moderation" element={<Suspense fallback={<div>Loading...</div>}><AdminContentModeration /></Suspense>} />
           <Route path="apis" element={<Suspense fallback={<div>Loading...</div>}><AdminAPIs /></Suspense>} />
           <Route path="settings" element={<Suspense fallback={<div>Loading...</div>}><AdminSettings /></Suspense>} />

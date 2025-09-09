@@ -13,6 +13,8 @@ import { Messaging } from './pages/Messaging';
 import { Support } from './pages/Support';
 import { Settings } from './pages/Settings';
 import { PromoManagement } from './pages/PromoManagement';
+import OrderHistory from './pages/OrderHistory';
+import CoinTransactions from './pages/CoinTransactions';
 import { PushNotification } from './pages/PushNotification';
 import { APIsManagement } from './pages/APIsManagement';
 import { CodeInjections } from './pages/CodeInjections';
@@ -28,6 +30,8 @@ const routes = [
   // payment routes removed
   { path: '/pricing', element: <PricingManagement /> },
   { path: '/promo', element: <PromoManagement /> },
+  { path: '/orders', element: <OrderHistory /> },
+  { path: '/admin/coin-transactions', element: <CoinTransactions /> },
   { path: '/content-moderation', element: <ContentModeration /> },
   { path: '/characters', element: <Characters /> },
   { path: '/notification', element: <PushNotification /> },

@@ -118,3 +118,40 @@ class PromoManagementUpdate(BaseModel):
 class PromoVerifyRequest(BaseModel):
     promo_code: str
     pricing_id: str
+
+
+class CoinTransactionRead(BaseModel):
+    id: int
+    user_id: int
+    subscription_id: str | None = None
+    transaction_type: str
+    coins: int
+    source_type: str
+    order_id: str
+    period_start: datetime | None = None
+    period_end: datetime | None = None
+    created_at: datetime
+
+    model_config = {
+        "from_attributes": True,
+    }
+
+class OrderRead(BaseModel):
+    id: int
+    promo_id: int | None = None
+    promo_code: str | None = None
+    user_id: int
+    stripe_customer_id: str
+    subscription_id: str | None = None
+    order_id: str | None = None
+    discount_type: str | None = None
+    applied_at: datetime
+    discount_applied: float
+    subtotal_at_apply: float
+    currency: str
+    status: str
+    created_at: datetime
+
+    model_config = {
+        "from_attributes": True,
+    }

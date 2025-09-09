@@ -4,10 +4,10 @@ from sqlalchemy.future import select
 from typing import List
 
 from app.api.v1.deps import get_db, require_admin
-from app.models.subscription import PricingPlan, PromoManagement
+from app.models.subscription import PricingPlan, PromoManagement, Order, CoinTransaction
 from app.schemas.subscription import (
     PricingPlanRead, PromoManagementRead, PricingPlanUpdate, PromoManagementUpdate,
-    PricingPlanCreate, PromoManagementCreate
+    PricingPlanCreate, PromoManagementCreate, OrderRead, CoinTransactionRead
 )
 
 router = APIRouter()
@@ -87,3 +87,15 @@ async def edit_promo(
     await db.commit()
     await db.refresh(promo)
     return {"detail": f"Promotion {promo_id} has been updated."}
+
+@router.get("/all-orders", dependencies=[Depends(require_admin)], response_model=List[OrderRead])
+async def get_all_orders(db: AsyncSession = Depends(get_db)) -> List[OrderRead]:
+    result = await db.execute(select(Order))
+    orders = result.scalars().all()
+    return orders
+
+@router.get("/all-coin-transactions", dependencies=[Depends(require_admin)], response_model=List[CoinTransactionRead])
+async def get_all_coin_transactions(db: AsyncSession = Depends(get_db)) -> List[CoinTransactionRead]:
+    result = await db.execute(select(CoinTransaction))
+    coin_transactions = result.scalars().all()
+    return coin_transactions

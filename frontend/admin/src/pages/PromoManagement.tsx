@@ -29,7 +29,7 @@ import {
   Snackbar
 } from '@mui/material';
 import {
-  Search as SearchIcon,
+  // Search icon removed as the admin search field was removed
   Add as AddIcon,
   MoreVert as MoreVertIcon,
   Edit as EditIcon,
@@ -45,7 +45,7 @@ const PromoManagement: React.FC = () => {
   const [filteredPromos, setFilteredPromos] = useState<Promo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  // removed admin search input - keep promos -> filteredPromos mapping
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedPromo, setSelectedPromo] = useState<Promo | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
@@ -74,20 +74,16 @@ const PromoManagement: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Filter promos based on search term
-    const filtered = promos.filter(promo =>
-      promo.promo_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      promo.coupon.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      promo.status.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredPromos(filtered);
-  }, [promos, searchTerm]);
+    // keep filteredPromos in sync with promos (no admin search bar)
+    setFilteredPromos(promos);
+  }, [promos]);
 
   const fetchPromos = async () => {
     try {
       setLoading(true);
       const data = await apiService.getPromos();
       setPromos(data);
+  setFilteredPromos(data);
       setError(null);
     } catch (err) {
       setError('Failed to fetch promos. Please try again.');
@@ -345,27 +341,7 @@ const PromoManagement: React.FC = () => {
 
       <Card sx={{ borderRadius: 2, boxShadow: 1, border: 1, borderColor: 'grey.200' }}>
         <Box sx={{ p: 3, borderBottom: 1, borderColor: 'grey.200' }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-            <TextField
-              placeholder="Search promos..."
-              variant="outlined"
-              size="small"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{ 
-                minWidth: 300,
-                '& .MuiOutlinedInput-root': {
-                  borderRadius: 2,
-                }
-              }}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon sx={{ color: 'grey.400' }} />
-                  </InputAdornment>
-                ),
-              }}
-            />
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 2, flexWrap: 'nowrap' }}>
             <Button
               variant="contained"
               startIcon={<AddIcon sx={{ fontSize: 18 }} />}
@@ -535,7 +511,7 @@ const PromoManagement: React.FC = () => {
               No promos found
             </Typography>
             <Typography variant="body2" sx={{ color: 'grey.400' }}>
-              {searchTerm ? 'Try adjusting your search criteria' : 'Create your first promotional campaign'}
+              {promos.length ? 'Try adjusting your search criteria' : 'Create your first promotional campaign'}
             </Typography>
           </Box>
         )}
