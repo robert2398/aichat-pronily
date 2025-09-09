@@ -109,6 +109,7 @@ const OrderHistory: React.FC = () => {
               <MenuItem value="All">All</MenuItem>
               <MenuItem value="promo">promo</MenuItem>
               <MenuItem value="subscription">subscription</MenuItem>
+              <MenuItem value="coin_purchase">coin_purchase</MenuItem>
             </Select>
           </FormControl>
 
@@ -149,7 +150,8 @@ const OrderHistory: React.FC = () => {
                 <TableCell>{o.discount_applied}</TableCell>
                 <TableCell>{o.subtotal_at_apply}</TableCell>
                 <TableCell>{o.status}</TableCell>
-                <TableCell>{new Date(o.created_at).toLocaleString()}</TableCell>
+                {/* Render date only to keep the row compact */}
+                <TableCell sx={{ whiteSpace: 'nowrap' }}>{new Date(o.created_at).toLocaleDateString()}</TableCell>
               </TableRow>
             ))}
           </TableBody>

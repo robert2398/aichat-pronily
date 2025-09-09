@@ -173,14 +173,15 @@ export default function Dashboard() {
         {error && <p className="text-red-600 text-sm">{error}</p>}
         {!loading && !error && kpis && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard title="ARPU" value={(kpis.ARPU ?? 0).toFixed(2)} change={pctChange(kpis.ARPU, kpis.previous_period?.ARPU)} />
-            <KpiCard title="MRR" value={(kpis.MRR ?? 0).toFixed(2)} change={pctChange(kpis.MRR, kpis.previous_period?.MRR)} />
-            <KpiCard title="Churn Rate" value={formatPercent(kpis.churn_rate)} change={(kpis.churn_rate - (kpis.previous_period?.churn_rate ?? 0))} percent />
-            <KpiCard title="LTV" value={(kpis.LTV ?? 0).toFixed(2)} change={pctChange(kpis.LTV, kpis.previous_period?.LTV)} />
-            <KpiCard title="Conversion Rate" value={formatPercent(kpis.conversion_rate)} change={(kpis.conversion_rate - (kpis.previous_period?.conversion_rate ?? 0))} percent />
-            <KpiCard title="Total Users" value={(kpis.total_users ?? 0).toLocaleString()} change={pctChange(kpis.total_users, kpis.previous_period?.total_users)} />
-            <KpiCard title="Active Subscribers" value={(kpis.active_subscribers ?? 0).toLocaleString()} change={pctChange(kpis.active_subscribers, kpis.previous_period?.active_subscribers)} />
-            <KpiCard title="Paying Users" value={(kpis.paying_users ?? 0).toLocaleString()} change={pctChange(kpis.paying_users, kpis.previous_period?.paying_users)} />
+            <KpiCard variant="indigo" title="ARPU" value={(kpis.ARPU ?? 0).toFixed(2)} change={pctChange(kpis.ARPU, kpis.previous_period?.ARPU)} />
+            <KpiCard variant
+a="emerald" title="MRR" value={(kpis.MRR ?? 0).toFixed(2)} change={pctChange(kpis.MRR, kpis.previous_period?.MRR)} />
+            <KpiCard variant="amber" title="Churn Rate" value={formatPercent(kpis.churn_rate)} change={(kpis.churn_rate - (kpis.previous_period?.churn_rate ?? 0))} percent />
+            <KpiCard variant="violet" title="LTV" value={(kpis.LTV ?? 0).toFixed(2)} change={pctChange(kpis.LTV, kpis.previous_period?.LTV)} />
+            <KpiCard variant="sky" title="Conversion Rate" value={formatPercent(kpis.conversion_rate)} change={(kpis.conversion_rate - (kpis.previous_period?.conversion_rate ?? 0))} percent />
+            <KpiCard variant="rose" title="Total Users" value={(kpis.total_users ?? 0).toLocaleString()} change={pctChange(kpis.total_users, kpis.previous_period?.total_users)} />
+            <KpiCard variant="cyan" title="Active Subscribers" value={(kpis.active_subscribers ?? 0).toLocaleString()} change={pctChange(kpis.active_subscribers, kpis.previous_period?.active_subscribers)} />
+            <KpiCard variant="lime" title="Paying Users" value={(kpis.paying_users ?? 0).toLocaleString()} change={pctChange(kpis.paying_users, kpis.previous_period?.paying_users)} />
           </div>
         )}
         {!loading && !error && !kpis && <p className="text-gray-500">No KPI data available</p>}
@@ -244,12 +245,23 @@ export default function Dashboard() {
   )
 }
 
-function KpiCard({ title, value, change, percent }) {
+function KpiCard({ title, value, change, percent, variant = 'indigo' }) {
   const positive = change > 0
   const negative = change < 0
   const displayChange = isNaN(change) ? 0 : change
+  const bgByVariant = {
+    indigo: 'from-indigo-50 to-white',
+    emerald: 'from-emerald-50 to-white',
+    amber: 'from-amber-50 to-white',
+    violet: 'from-violet-50 to-white',
+    sky: 'from-sky-50 to-white',
+    rose: 'from-rose-50 to-white',
+    cyan: 'from-cyan-50 to-white',
+    lime: 'from-lime-50 to-white',
+  }
+  const gradient = bgByVariant[variant] || bgByVariant.indigo
   return (
-    <div className="p-4 rounded-lg border bg-gradient-to-br from-gray-50 to-white shadow-sm">
+    <div className={`p-4 rounded-lg border bg-gradient-to-br ${gradient} shadow-sm`}>
       <h3 className="text-sm font-medium text-gray-600 mb-1">{title}</h3>
       <p className="text-2xl font-bold text-gray-900">{value}</p>
       <p className={"text-xs mt-1 " + (positive ? 'text-green-600' : negative ? 'text-red-600' : 'text-gray-500')}>
