@@ -1,6 +1,6 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { format, subDays } from 'date-fns'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useLocation } from 'react-router-dom'
 
 /** Interval granularity supported by monetization dashboard */
 export type Interval = 'daily' | 'weekly' | 'monthly' | 'quarterly'
@@ -115,22 +115,26 @@ function writeSearchParams(filters: Filters, setSearchParams: (next: URLSearchPa
 
 export const FiltersProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [searchParams, setSearchParams] = useSearchParams()
+  const location = useLocation()
+  const isDashboard = location.pathname.startsWith('/admin/dashboard')
   const initRef = useRef<boolean>(false)
-  const [filters, setFilters] = useState<Filters>(() => readInitial(searchParams))
+  // Only read initial search params when on the dashboard; otherwise use defaults
+  const [filters, setFilters] = useState<Filters>(() => isDashboard ? readInitial(searchParams) : readInitial(new URLSearchParams()))
 
-  // On first mount if URL missing params write defaults
+  // On first mount if on dashboard ensure URL has canonical params
   useEffect(() => {
     if (initRef.current) return
     initRef.current = true
+    if (!isDashboard) return
     // ensure URL has canonical params
     writeSearchParams(filters, setSearchParams)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isDashboard])
 
   // When filters object changes, sync to URL
   const filtersRef = useRef(filters)
   useEffect(() => { filtersRef.current = filters })
-  useEffect(() => { writeSearchParams(filters, setSearchParams) }, [filters, setSearchParams])
+  useEffect(() => { if (isDashboard) writeSearchParams(filters, setSearchParams) }, [filters, setSearchParams, isDashboard])
 
   const setPreset = useCallback((preset: DatePreset) => {
     setFilters(prev => {

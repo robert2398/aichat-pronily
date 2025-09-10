@@ -607,7 +607,17 @@ async def coins_trends(
 ):
     """Coins purchased vs spent over time (simple weekly/monthly grouping)."""
     # use coin_transactions table for spent and purchases (transaction_type)
-    period_label = func.to_char(CoinTransaction.created_at, 'IYYY-"W"IW') if interval == 'weekly' else func.to_char(CoinTransaction.created_at, 'YYYY-MM')
+    # support daily | weekly | monthly | quarterly
+    interval = (interval or 'weekly').lower()
+    if interval == 'daily':
+        period_label = func.to_char(CoinTransaction.created_at, 'YYYY-MM-DD')
+    elif interval == 'weekly':
+        period_label = func.to_char(CoinTransaction.created_at, 'IYYY-"W"IW')
+    elif interval == 'quarterly':
+        period_label = func.to_char(CoinTransaction.created_at, 'YYYY-"Q"Q')
+    else:
+        # default to monthly
+        period_label = func.to_char(CoinTransaction.created_at, 'YYYY-MM')
     q = select(
         period_label.label('period'),
     func.coalesce(func.sum(case((CoinTransaction.transaction_type == 'credit', CoinTransaction.coins), else_=0)), 0).label('coins_purchased'),

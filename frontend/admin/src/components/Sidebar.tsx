@@ -211,13 +211,14 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ icon: Icon, open, forcedO
   const toggleExpand = () => {
     // Repurposed: always navigate to overview and refresh KPIs; allow expand toggle only if not on dashboard route
     if (!location.pathname.startsWith('/admin/dashboard')) {
-      navigate('/admin/dashboard');
+      // Preserve any existing query params when navigating to dashboard
+      navigate(`/admin/dashboard${location.search}`);
       try { window.dispatchEvent(new CustomEvent('dashboard:navigate:overview')); } catch {}
       setExpandedStored(true);
       return;
     }
     // Already on dashboard route: reset to overview (clear hash) and refresh
-    window.history.replaceState(null, '', '/admin/dashboard');
+    window.history.replaceState(null, '', `/admin/dashboard${location.search}`);
     try { window.dispatchEvent(new CustomEvent('dashboard:navigate:overview')); } catch {}
     window.scrollTo({ top: 0, behavior: 'smooth' });
     // Don't collapse while on dashboard analytics (forcedOpen true)
@@ -241,10 +242,10 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ icon: Icon, open, forcedO
     } catch { /* ignore */ }
     if (id === 'overview') {
       if (location.pathname.startsWith('/admin/dashboard')) {
-        window.history.replaceState(null, '', '/admin/dashboard');
+        window.history.replaceState(null, '', `/admin/dashboard${location.search}`);
         window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        navigate('/admin/dashboard');
+        navigate(`/admin/dashboard${location.search}`);
       }
       return;
     }
@@ -252,10 +253,10 @@ const DashboardMenu: React.FC<DashboardMenuProps> = ({ icon: Icon, open, forcedO
       const el = document.getElementById(id);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        window.history.replaceState(null, '', `/admin/dashboard#${id}`);
+        window.history.replaceState(null, '', `/admin/dashboard${location.search}#${id}`);
       }
     } else {
-      navigate(`/admin/dashboard#${id}`);
+      navigate(`/admin/dashboard${location.search}#${id}`);
     }
   };
 

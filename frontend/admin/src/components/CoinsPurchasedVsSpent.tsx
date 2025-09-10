@@ -4,17 +4,24 @@ import { SectionCard } from './SectionCard'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceArea } from 'recharts'
 import { useFilters } from '../context/FiltersContext'
 import { coinsApi, type CoinTrendsResponse, type CoinTrendsRow } from '../services/coinsApi.ts'
+import { cn } from '../lib/utils'
+import { Button } from './ui/button'
+import { RefreshCw } from 'lucide-react'
 
 export function CoinsPurchasedVsSpent() {
   const { filters, setFilters } = useFilters()
   const startDate = filters.fromISO
   const endDate = filters.toISO
   const interval = filters.interval
+  type IntervalOpt = 'daily' | 'weekly' | 'monthly' | 'quarterly'
+  // local interval control (defaults to global filter interval, stays in sync)
+  const [localInterval, setLocalInterval] = useState<IntervalOpt>(interval as IntervalOpt)
+  useEffect(() => { setLocalInterval(filters.interval as IntervalOpt) }, [filters.interval])
   const [shadeRanges, setShadeRanges] = useState<Array<{ start: number; end: number }>>([])
 
-  const { data, isLoading, error, refetch } = useQuery<CoinTrendsResponse>({
-    queryKey: ['coins-trends', startDate, endDate, interval],
-    queryFn: () => coinsApi.getTrends({ startDate, endDate, interval }),
+  const { data, isLoading, error, refetch, isFetching } = useQuery<CoinTrendsResponse>({
+    queryKey: ['coins-trends', startDate, endDate, localInterval],
+    queryFn: () => coinsApi.getTrends({ startDate, endDate, interval: localInterval }),
     enabled: !!startDate && !!endDate,
   })
 
@@ -74,6 +81,25 @@ export function CoinsPurchasedVsSpent() {
       </div>
 
       {/* Chart */}
+      {/* Controls: interval buttons + refresh */}
+      <div className="flex items-center justify-end gap-2 mb-4">
+        {(['daily','weekly','monthly','quarterly'] as IntervalOpt[]).map(opt => {
+          const active = localInterval === opt
+          const label = opt === 'daily' ? 'Daily' : opt === 'weekly' ? 'Weekly' : opt === 'monthly' ? 'Monthly' : 'Quarterly'
+          return (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => setLocalInterval(opt)}
+              className={cn('px-3 py-1.5 text-xs font-medium rounded-md border transition', active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')}
+            >{label}</button>
+          )
+        })}
+        <Button size="sm" variant="outline" onClick={() => refetch()} disabled={isFetching} className="ml-1">
+          <RefreshCw className={cn('h-3.5 w-3.5 mr-1', isFetching && 'animate-spin')} />
+          {isFetching ? 'Refreshing' : 'Refresh'}
+        </Button>
+      </div>
       <div className="h-[380px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={rows}>

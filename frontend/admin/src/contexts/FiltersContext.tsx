@@ -39,6 +39,9 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
 
   // Sync with URL search params
   useEffect(() => {
+    const pathname = window.location.pathname || ''
+    const isDashboard = pathname.startsWith('/admin/dashboard')
+    if (!isDashboard) return
     const params = new URLSearchParams(window.location.search)
     const updates: Partial<FiltersState> = {}
 
@@ -98,7 +101,9 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
       params.set('currency', newFilters.currency)
 
       const newUrl = `${window.location.pathname}?${params.toString()}`
-      window.history.replaceState({}, '', newUrl)
+      if (window.location.pathname.startsWith('/admin/dashboard')) {
+        window.history.replaceState({}, '', newUrl)
+      }
 
       return newFilters
     })
@@ -106,7 +111,9 @@ export function FiltersProvider({ children }: { children: React.ReactNode }) {
 
   const resetFilters = () => {
     setFilters(defaultFilters)
-    window.history.replaceState({}, '', window.location.pathname)
+    if (window.location.pathname.startsWith('/admin/dashboard')) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
   }
 
   return (

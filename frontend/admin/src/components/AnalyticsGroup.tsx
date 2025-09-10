@@ -86,10 +86,10 @@ export const AnalyticsGroup: React.FC = () => {
       const el = document.getElementById(id);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        window.history.replaceState(null, '', `/admin/dashboard#${id}`);
+        window.history.replaceState(null, '', `/admin/dashboard${location.search}#${id}`);
       }
     } else {
-      navigate(`/admin/dashboard#${id}`);
+      navigate(`/admin/dashboard${location.search}#${id}`);
     }
   }, [location.pathname, navigate]);
 

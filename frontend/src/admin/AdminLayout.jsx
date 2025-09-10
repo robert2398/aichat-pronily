@@ -20,11 +20,11 @@ export default function AdminLayout() {
     <div className="min-h-screen bg-[#f8fafc] text-black">
       <QueryClientProvider client={adminQueryClient}>
         <DateRangeProvider>
-  <FiltersProvider>
+        <FiltersProvider>
         {/* Sidebar */}
         <Sidebar isOpen={isOpen} onClose={() => setIsOpen(false)} />
-  {/* Main content (FilterBar moved inside specific pages e.g. Dashboard) */}
-  <main style={{ paddingTop: 16, marginLeft: isOpen ? 288 : 0, transition: 'margin-left 0.3s' }}>
+        {/* Main content (FilterBar moved inside specific pages e.g. Dashboard) */}
+        <main style={{ paddingTop: 16, marginLeft: isOpen ? 288 : 0, transition: 'margin-left 0.3s' }}>
           <div className="mx-auto max-w-7xl px-4 pb-6">
             <Suspense fallback={<div>Loading admin...</div>}>
               <Outlet />
