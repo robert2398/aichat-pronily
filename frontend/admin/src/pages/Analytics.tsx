@@ -24,9 +24,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell,
 } from 'recharts';
-import type { TooltipProps } from 'recharts';
+// TooltipProps type intentionally unused in this file
 import { format, subDays } from 'date-fns';
 
 // --- DUMMY DATA ---

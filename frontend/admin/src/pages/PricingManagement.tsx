@@ -650,4 +650,7 @@ const PricingManagement: React.FC = () => {
   );
 };
 
+// Provide a named export as a compatibility shim so imports that expect a named export
+// (e.g. `import { PricingManagement } from './pages/PricingManagement'`) will work.
+export { PricingManagement };
 export default PricingManagement;

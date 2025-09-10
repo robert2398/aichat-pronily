@@ -1,9 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import React from 'react'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
-import { FiltersProvider } from '../src/context/FiltersContext'
+import { FiltersProvider } from '../src/contexts/FiltersContext'
 import { FilterBar } from '../src/components/dashboard/FilterBar'
 
 vi.mock('../src/api/planSummary', () => ({

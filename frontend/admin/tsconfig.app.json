@@ -28,6 +28,8 @@
     "paths": {
       "@/*": ["./src/*"]
     }
+  ,
+  "types": ["@testing-library/jest-dom", "vitest"]
   },
-  "include": ["src"]
+  "include": ["src", "src/global.d.ts", "tests", "tests/**/*.ts", "tests/**/*.tsx"],
 }

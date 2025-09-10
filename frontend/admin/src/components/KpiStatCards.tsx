@@ -5,7 +5,7 @@ import { SectionCard } from './SectionCard'
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card'
 import { formatCurrency, formatPercent } from '../lib/utils'
 import { cn } from '../lib/utils'
-import { dashboardApi } from '../services/dashboardApi.js'
+import dashboardApi from '../services/dashboardApi.js'
 
 interface KpiData {
   total_revenue: number
@@ -79,7 +79,7 @@ export function KpiStatCards() {
   console.log('🔍 KpiStatCards filters:', filters)
   
   const { data, isLoading, error } = useQuery({
-    queryKey: ['kpi-summary', filters.toISO, filters.currency],
+    queryKey: ['kpi-summary', filters.toISO],
     queryFn: () => {
       console.log('🎯 React Query executing...')
       return fetchKpiData({

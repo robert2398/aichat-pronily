@@ -615,6 +615,16 @@ class APIService {
       throw error;
     }
   }
+  
+  async editUser(userId: number, data: { full_name?: string; role?: string; status?: string }): Promise<void> {
+    try {
+      // Use PUT for edits to follow other endpoints' convention
+      await this.api.put(`/admin/users/edit/${userId}`, data);
+    } catch (error) {
+      console.error(`Error editing user ${userId}:`, error);
+      throw error;
+    }
+  }
   // ...existing code...
 
   async getAllModels(): Promise<AllModelsResponse> {

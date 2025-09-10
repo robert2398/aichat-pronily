@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import type { SelectChangeEvent } from '@mui/material';
 import {
   Box,
   Typography,
@@ -250,7 +251,7 @@ export const Users: React.FC = () => {
 
     try {
       await apiService.editUser(updatedUser.id, {
-        full_name: updatedUser.full_name,
+        full_name: updatedUser.full_name ?? undefined,
         role: updatedUser.role,
       });
       setSuccessMessage(`User ${updatedUser.email} has been successfully updated.`);
@@ -436,7 +437,7 @@ export const Users: React.FC = () => {
               labelId="role-filter-label"
               value={roleFilter}
               label="Role"
-              onChange={(e) => setRoleFilter(e.target.value)}
+              onChange={(e: SelectChangeEvent<string>) => setRoleFilter(e.target.value)}
               sx={{
                 '& .MuiSelect-select': {
                   fontSize: 14,
@@ -461,7 +462,7 @@ export const Users: React.FC = () => {
               labelId="status-filter-label"
               value={statusFilter}
               label="Status"
-              onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e: SelectChangeEvent<string>) => setStatusFilter(e.target.value)}
               sx={{
                 '& .MuiSelect-select': {
                   fontSize: 14,
@@ -779,14 +780,14 @@ export const Users: React.FC = () => {
               inputProps={{ minLength: 8, maxLength: 128 }}
               helperText="Password must be at least 8 characters."
             />
-            <FormControl fullWidth>
-              <InputLabel>Role</InputLabel>
-              <Select
-                name="role"
-                value={addUserForm.role}
-                label="Role"
-                onChange={handleAddUserChange}
-              >
+              <FormControl fullWidth>
+                <InputLabel>Role</InputLabel>
+                <Select
+                  name="role"
+                  value={addUserForm.role}
+                  label="Role"
+                  onChange={(e) => handleAddUserChange({ target: { name: 'role', value: (e as any).target.value } } as React.ChangeEvent<HTMLInputElement>)}
+                >
                 <MenuItem value="user">User</MenuItem>
                 <MenuItem value="admin">Admin</MenuItem>
               </Select>
@@ -1020,8 +1021,9 @@ export const Users: React.FC = () => {
                                           justifyContent: 'center'
                                         }}
                                         onError={(e) => {
-                                          e.currentTarget.style.display = 'none';
-                                          e.currentTarget.nextElementSibling.style.display = 'flex';
+                                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                          const sibling = e.currentTarget.nextElementSibling as HTMLElement | null;
+                                          if (sibling) sibling.style.display = 'flex';
                                         }}
                                       />
                                       <Box sx={{

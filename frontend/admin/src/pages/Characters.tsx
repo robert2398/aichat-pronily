@@ -34,8 +34,7 @@ import {
   Search as SearchIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
-  Add as AddIcon,
-  FilterList as FilterListIcon
+  Add as AddIcon
 } from '@mui/icons-material';
 import { apiService, type Character } from '../services/api';
 import { CreateCharacterModal } from '../components/CreateCharacterModal';

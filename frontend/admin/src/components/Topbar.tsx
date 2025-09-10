@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Sun, Moon, User } from 'lucide-react';
+import { Search, Sun, User } from 'lucide-react';
 
 interface TopbarProps {
   userName?: string;

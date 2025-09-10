@@ -18,6 +18,7 @@ import {
   Paper,
   Divider,
 } from '@mui/material';
+import { ImageList, ImageListItem } from '@mui/material';
 import {
   Close as CloseIcon,
   Person as PersonIcon,
@@ -25,6 +26,7 @@ import {
   Description as DescriptionIcon,
 } from '@mui/icons-material';
 import { apiService, type Character } from '../services/api';
+import useAssets from '../hooks/useAssets';
 
 interface CreateCharacterModalProps {
   open: boolean;
@@ -35,7 +37,7 @@ interface CreateCharacterModalProps {
 
 interface CharacterFormData {
   name: string;
-  gender: "Girl" | "Guys" | "Trans";
+  gender: 'female' | 'male' | 'trans';
   style: string;
   ethnicity: string;
   age: number | '';
@@ -52,11 +54,12 @@ interface CharacterFormData {
   clothing: string;
   special_features: string;
   user_query_instructions: string;
+  avatar?: string | null;
 }
 
 const initialFormData: CharacterFormData = {
   name: '',
-  gender: 'Girl',
+  gender: 'female',
   style: '',
   ethnicity: '',
   age: '',
@@ -73,11 +76,12 @@ const initialFormData: CharacterFormData = {
   clothing: '',
   special_features: '',
   user_query_instructions: '',
+  avatar: null,
 };
 
-// Gender-specific options
+// Gender-specific options (keys are canonical tokens: female | male | trans)
 const genderOptions = {
-  Girl: {
+  female: {
     style: ['Realistic', 'Anime'],
     ethnicity: ['Caucasian', 'Latina', 'Asian'],
     eye_colour: ['Blue', 'Brown', 'Green', 'Yellow', 'Red'],
@@ -92,7 +96,7 @@ const genderOptions = {
     clothing: ['Bikini', 'Skirt', 'Cheerleader Outfit', 'Pencil Dress', 'Long Dress', 'Soccer Uniform', 'Tennis Outfit', 'Wedding Dress', 'Fancy Dress', 'Witch costume', 'Summer Dress', 'Jeans', 'Maid Outfits', 'Medieval Armor', 'Lab Coat', 'Cowboy Outfit', 'Princess Outfit', 'Corset', 'Long Coat', 'Hoodie', 'Leggings', 'Ninja Outfit', 'Pajamas', 'Hijab', 'Police Uniform'],
     special_features: ['Public Hair', 'Pregnant', 'Glasses', 'Freckles', 'Tattoos', 'Belly Piercing', 'Nipple Piercing']
   },
-  Guys: {
+  male: {
     style: ['Realistic', 'Anime'],
     ethnicity: ['Caucasian', 'Asian', 'Arabic', 'Black'],
     eye_colour: ['Blue', 'Brown', 'Green', 'Yellow', 'Red'],
@@ -106,7 +110,7 @@ const genderOptions = {
     clothing: ['Suit & Shirt', 'Pant & Sweater', 'Chef', 'Blazer & T-Shirt', 'Police', 'Denim & Khakis', 'Hip-Hop', 'Tennis Outfit', 'Military', 'Waiter', 'Tee & Leather Pants', 'Summer Dress', 'Jeans', 'Shorts & Henley', 'Jacket & Chinos', 'Surfer', 'Cowboy Outfit', 'Basketball', 'Shirt & Corduroy Pants', 'Long Coat', 'Hoodie', 'Cowboy', 'Ninja Outfit', 'Astronaut', 'Polo & Lines Pants', 'Ski'],
     special_features: ['Public Hair', 'Glasses', 'Freckles', 'Tattoos']
   },
-  Trans: {
+  trans: {
     style: ['Realistic', 'Anime'],
     ethnicity: ['Caucasian', 'Latina', 'Asian'],
     eye_colour: ['Blue', 'Brown', 'Green', 'Yellow', 'Red'],
@@ -133,14 +137,30 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // normalize gender key and load assets for the current gender (falls back to hardcoded lists)
+  const genderKey = formData.gender === 'male' ? 'male' : 'female';
+  // Load ethnicity assets (now using canonical subfolder name 'ethnicity')
+  const ethnicityAssets = useAssets(genderKey, 'ethnicity').items;
+  // Load character/avatar assets (canonical subfolder 'character') for the avatar picker
+  const characterAssets = useAssets(genderKey, 'character').items;
+
   const isEditMode = Boolean(editCharacter);
 
   // Populate form data when editing
   useEffect(() => {
     if (editCharacter && open) {
+      // normalize incoming character.gender to canonical tokens
+      const mapGender = (g: any) => {
+        const low = String(g || '').toLowerCase()
+        if (['girl', 'girls', 'female', 'woman', 'women'].includes(low)) return 'female'
+        if (['men', 'man', 'male', 'guys'].includes(low)) return 'male'
+        if (low === 'trans') return 'trans'
+        return 'female'
+      }
+
       setFormData({
         name: editCharacter.name,
-        gender: editCharacter.gender as "Girl" | "Guys" | "Trans",
+        gender: mapGender(editCharacter.gender),
         style: editCharacter.style,
         ethnicity: editCharacter.ethnicity,
         age: editCharacter.age,
@@ -157,6 +177,7 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({
         clothing: editCharacter.clothing,
         special_features: editCharacter.special_features,
         user_query_instructions: editCharacter.user_query_instructions || '',
+        avatar: (editCharacter as any).avatar || null,
       });
     } else if (!editCharacter && open) {
       setFormData(initialFormData);
@@ -270,17 +291,17 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({
     }
 
     // Gender-specific validations
-    if ((formData.gender === 'Girl' || formData.gender === 'Trans') && !formData.breast_size) {
+  if ((formData.gender === 'female' || formData.gender === 'trans') && !formData.breast_size) {
       setError('Breast size is required.');
       return;
     }
 
-    if ((formData.gender === 'Girl' || formData.gender === 'Trans') && !formData.butt_size) {
+  if ((formData.gender === 'female' || formData.gender === 'trans') && !formData.butt_size) {
       setError('Butt size is required.');
       return;
     }
 
-    if (formData.gender === 'Guys' && !formData.dick_size) {
+  if (formData.gender === 'male' && !formData.dick_size) {
       setError('Dick size is required.');
       return;
     }
@@ -298,16 +319,17 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({
         hair_style: formData.hair_style,
         hair_colour: formData.hair_colour,
         body_type: formData.body_type,
-        // Gender-specific fields with null values for other genders
-        breast_size: (formData.gender === 'Girl' || formData.gender === 'Trans') ? formData.breast_size : null,
-        butt_size: (formData.gender === 'Girl' || formData.gender === 'Trans') ? formData.butt_size : null,
-        dick_size: formData.gender === 'Guys' ? formData.dick_size : null,
+  // Gender-specific fields with null values for other genders
+  breast_size: (formData.gender === 'female' || formData.gender === 'trans') ? formData.breast_size : null,
+  butt_size: (formData.gender === 'female' || formData.gender === 'trans') ? formData.butt_size : null,
+  dick_size: formData.gender === 'male' ? formData.dick_size : null,
         personality: formData.personality,
         voice_type: formData.voice_type,
         relationship_type: formData.relationship_type,
         clothing: formData.clothing,
         special_features: formData.special_features,
         user_query_instructions: formData.user_query_instructions.trim() || null,
+  avatar: formData.avatar || null,
       };
 
       if (isEditMode && editCharacter) {
@@ -447,11 +469,47 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({
                     onChange={handleInputChange('gender')}
                     label="Gender"
                   >
-                    <MenuItem value="Girl">Girl</MenuItem>
-                    <MenuItem value="Guys">Guys</MenuItem>
-                    <MenuItem value="Trans">Trans</MenuItem>
+                    <MenuItem value="female">Female</MenuItem>
+                    <MenuItem value="male">Male</MenuItem>
+                    <MenuItem value="trans">Trans</MenuItem>
                   </Select>
                 </FormControl>
+              </Box>
+
+              {/* Avatar picker (small thumbnails) */}
+              <Box sx={{ mt: 2 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                  <Typography variant="subtitle2">Choose Avatar</Typography>
+                  <Box sx={{ flex: 1 }} />
+                  <Button
+                    size="small"
+                    onClick={() => setFormData(prev => ({ ...prev, avatar: null }))}
+                    disabled={loading}
+                  >
+                    Clear
+                  </Button>
+                </Box>
+
+                <ImageList cols={6} gap={8} sx={{ width: '100%', maxHeight: 160, overflow: 'auto' }}>
+                  {characterAssets.slice(0, 36).map(item => (
+                    <ImageListItem key={item.id} sx={{ cursor: 'pointer', borderRadius: 1 }}>
+                      <img
+                        src={item.url}
+                        alt={item.name}
+                        style={{ width: '100%', height: 72, objectFit: 'cover', borderRadius: 6, border: item.url === formData.avatar ? '2px solid #1976d2' : '2px solid transparent' }}
+                        onClick={() => setFormData(prev => ({ ...prev, avatar: item.url }))}
+                      />
+                    </ImageListItem>
+                  ))}
+                </ImageList>
+
+                {/* Selected avatar preview */}
+                {formData.avatar && (
+                  <Box sx={{ mt: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <Typography variant="body2">Selected:</Typography>
+                    <Box component="img" src={formData.avatar} alt="selected avatar" sx={{ width: 64, height: 64, objectFit: 'cover', borderRadius: 1, border: '1px solid', borderColor: 'grey.200' }} />
+                  </Box>
+                )}
               </Box>
 
               <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
@@ -475,9 +533,18 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({
                     onChange={handleInputChange('ethnicity')}
                     label="Ethnicity"
                   >
-                    {genderOptions[formData.gender]?.ethnicity?.map((option) => (
-                      <MenuItem key={option} value={option}>{option}</MenuItem>
-                    ))}
+                      {ethnicityAssets.length > 0 ? (
+                        ethnicityAssets.map((asset) => (
+                          <MenuItem key={asset.id} value={asset.name} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <img src={asset.url} alt={asset.name} style={{ width: 28, height: 20, objectFit: 'cover', borderRadius: 4 }} />
+                            <span>{asset.name}</span>
+                          </MenuItem>
+                        ))
+                      ) : (
+                        genderOptions[formData.gender]?.ethnicity?.map((option) => (
+                          <MenuItem key={option} value={option}>{option}</MenuItem>
+                        ))
+                      )}
                   </Select>
                 </FormControl>
               </Box>
@@ -573,7 +640,7 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({
                 </FormControl>
 
                 {/* Conditional fields based on gender */}
-                {(formData.gender === 'Girl' || formData.gender === 'Trans') && (
+                {(formData.gender === 'female' || formData.gender === 'trans') && (
                   <FormControl fullWidth required disabled={loading}>
                     <InputLabel>Breast Size</InputLabel>
                     <Select
@@ -588,7 +655,7 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({
                   </FormControl>
                 )}
 
-                {formData.gender === 'Guys' && (
+                {formData.gender === 'male' && (
                   <FormControl fullWidth required disabled={loading}>
                     <InputLabel>Dick Size</InputLabel>
                     <Select
@@ -604,7 +671,7 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({
                 )}
               </Box>
 
-              {(formData.gender === 'Girl' || formData.gender === 'Trans') && (
+              {(formData.gender === 'female' || formData.gender === 'trans') && (
                 <Box sx={{ display: 'flex', gap: 2, flexDirection: { xs: 'column', sm: 'row' } }}>
                   <FormControl fullWidth required disabled={loading}>
                     <InputLabel>Butt Size</InputLabel>
@@ -762,8 +829,8 @@ export const CreateCharacterModal: React.FC<CreateCharacterModalProps> = ({
           onClick={handleSubmit}
           variant="contained"
           disabled={loading || !formData.name.trim() || !formData.style || !formData.ethnicity || formData.age === '' || !formData.eye_colour || !formData.hair_style || !formData.hair_colour || !formData.body_type || !formData.personality || !formData.voice_type || !formData.relationship_type || !formData.clothing || !formData.special_features || 
-            ((formData.gender === 'Girl' || formData.gender === 'Trans') && (!formData.breast_size || !formData.butt_size)) ||
-            (formData.gender === 'Guys' && !formData.dick_size)}
+            ((formData.gender === 'female' || formData.gender === 'trans') && (!formData.breast_size || !formData.butt_size)) ||
+            (formData.gender === 'male' && !formData.dick_size)}
           sx={{
             fontWeight: 600,
             px: 4,

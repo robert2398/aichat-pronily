@@ -861,4 +861,7 @@ const PromoManagement: React.FC = () => {
   );
 };
 
+// Provide a named export as a compatibility shim so imports that expect a named export
+// (e.g. `import { PromoManagement } from './pages/PromoManagement'`) will work.
+export { PromoManagement };
 export default PromoManagement;

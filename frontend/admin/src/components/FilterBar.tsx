@@ -1,9 +1,9 @@
-import React from 'react'
+// React import not required with the new JSX transform
 import { useQuery } from '@tanstack/react-query'
 import { Calendar, Download } from 'lucide-react'
 import { format } from 'date-fns'
 
-import { useFilters } from '../context/FiltersContext'
+import { useFilters } from '../contexts/FiltersContext'
 import { Button } from './ui/button'
 import {
   Select,

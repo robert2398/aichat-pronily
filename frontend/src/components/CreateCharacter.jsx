@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from "react";
+import { getAssets } from '../utils/assets'
 import { useNavigate } from "react-router-dom";
 import CreateCharacterSave from './CreateCharacterSave';
 
@@ -53,29 +54,59 @@ export default function CreateCharacter() {
   const isFemaleLike = gender !== "male";
 
   /** data */
-  const ethnicities = useMemo(
-    () => ["Asian", "Black", "White", "Latina", "Arab", "Indian"].map((x, i) => ({ id: `eth${i}`, label: x })),
-    []
-  );
+  // Load images from assets using canonical folder names, fallback to hardcoded lists
+  const ethnicityItems = useMemo(() => {
+    const imgs = getAssets(gender === 'male' ? 'male' : 'female', 'ethnicity')
+    if (imgs && imgs.length) return imgs
+    return ["Asian", "Black", "White", "Latina", "Arab", "Indian"].map((x, i) => ({ id: `eth${i}`, label: x }))
+  }, [gender])
+  
+  const hairStyleItems = useMemo(() => {
+    const imgs = getAssets(gender === 'male' ? 'male' : 'female', 'hair-style')
+    if (imgs && imgs.length) return imgs
+    return ["Straight Long", "Straight Short", "Pigtails", "Hair Bun", "Ponytail"].map((x, i) => ({ id: `hair${i + 1}`, label: x }))
+  }, [gender])
+  
+  const bodyTypeItems = useMemo(() => {
+    const imgs = getAssets(gender === 'male' ? 'male' : 'female', 'body-type')
+    if (imgs && imgs.length) return imgs
+    return ["Slim", "Athletic", "Voluptuous", "Curvy", "Muscular", "Average"].map((x, i) => ({ id: `body${i + 1}`, label: x }))
+  }, [gender])
+  
+  const breastSizeItems = useMemo(() => {
+    if (gender === 'male') return []
+    const imgs = getAssets('female', 'breast-size')
+    if (imgs && imgs.length) return imgs
+    return ["Flat", "Small", "Medium", "Large", "XL", "XXL"].map((x, i) => ({ id: `breast${i + 1}`, label: x }))
+  }, [gender])
+  
+  const buttSizeItems = useMemo(() => {
+    if (gender === 'male') return []
+    const imgs = getAssets('female', 'butt-size')
+    if (imgs && imgs.length) return imgs
+    return ["Small", "Skinny", "Athletic", "Medium", "Large", "XL"].map((x, i) => ({ id: `butt${i + 1}`, label: x }))
+  }, [gender])
+  
+  const characterItems = useMemo(() => {
+    const imgs = getAssets(gender === 'male' ? 'male' : 'female', 'character')
+    if (imgs && imgs.length) return imgs
+    return ["Realistic", "Anime"].map((x, i) => ({ id: `char${i + 1}`, label: x }))
+  }, [gender])
+  
+  const outfitItems = useMemo(() => {
+    if (gender !== 'male') return []
+    const imgs = getAssets('male', 'outfit')
+    return imgs || []
+  }, [gender])
+
   const eyeColors = useMemo(() => ["Black", "Brown", "Red", "Yellow", "Green", "Purple", "Teal", "White"], []);
-  const hairStyles = useMemo(
-    () => ["Straight Long", "Straight Short", "Pigtails", "Hair Bun", "Ponytail"].map((x, i) => ({ id: `hair${i + 1}`, label: x })),
-    []
-  );
+  
+  // Legacy aliases for backward compatibility
+  const hairStyles = hairStyleItems;
   const hairColors = eyeColors;
-  // use 1-based ids so saved values like `body1`/`breast2`/`butt2` align with stored data
-  const bodies = useMemo(
-    () => ["Slim", "Athletic", "Voluptuous", "Curvy", "Muscular", "Average"].map((x, i) => ({ id: `body${i + 1}`, label: x })),
-    []
-  );
-  const breasts = useMemo(
-    () => ["Flat", "Small", "Medium", "Large", "XL", "XXL"].map((x, i) => ({ id: `breast${i + 1}`, label: x })),
-    []
-  );
-  const butts = useMemo(
-    () => ["Small", "Skinny", "Athletic", "Medium", "Large", "XL"].map((x, i) => ({ id: `butt${i + 1}`, label: x })),
-    []
-  );
+  const bodies = bodyTypeItems;
+  const breasts = breastSizeItems;
+  const butts = buttSizeItems;
   const personalities = useMemo(
     () =>
       [
@@ -263,8 +294,25 @@ export default function CreateCharacter() {
   // helper: find a label by id from a list of {id,label}
   const labelFor = (list, id) => {
     if (!id) return "N/A";
-    const found = (list || []).find((x) => x.id === id);
-    return found ? found.label : id;
+    const found = (list || []).find((x) => x.id === id || (x.name && String(x.name) === String(id)) || (x.label && String(x.label) === String(id)));
+    if (found) return found.label || found.name || id;
+    return id;
+  };
+
+  // find an item in a list by id/name/label (case-insensitive for name/label)
+  const findItem = (list, value) => {
+    if (!value || !list) return null;
+    const v = String(value || '');
+    return (list || []).find((x) => {
+      if (!x) return false;
+      if (x.id && x.id === v) return true;
+      if (x.name && String(x.name) === v) return true;
+      if (x.label && String(x.label) === v) return true;
+      // case-insensitive match
+      if (x.name && String(x.name).toLowerCase() === v.toLowerCase()) return true;
+      if (x.label && String(x.label).toLowerCase() === v.toLowerCase()) return true;
+      return false;
+    }) || null;
   };
 
   /** small presentational wrapper */
@@ -296,7 +344,7 @@ export default function CreateCharacter() {
     </button>
   );
 
-  const SelectCard = ({ selected, label, onClick, icon }) => (
+  const SelectCard = ({ selected, label, onClick, icon, imgUrl }) => (
     <button
       onClick={onClick}
       className={`rounded-xl overflow-hidden border p-0 bg-white/[.015] text-center ${
@@ -304,7 +352,11 @@ export default function CreateCharacter() {
       }`}
     >
       <div className="h-28 flex items-center justify-center text-4xl bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.06),rgba(255,255,255,0)_70%)]">
-        {icon || "🎭"}
+        {imgUrl ? (
+          <img src={imgUrl} alt={label} className="h-full w-full object-cover" />
+        ) : (
+          icon || "🎭"
+        )}
       </div>
       <div className="px-2 py-2 text-sm text-white/80">{label}</div>
     </button>
@@ -360,19 +412,25 @@ export default function CreateCharacter() {
         {step === 1 && (
           <StepWrapper title="Choose Style">
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              {["Realistic", "Anime"].map((label) => (
+              {characterItems.map((c) => (
                 <button
-                  key={label}
-                  onClick={() => bump("style", label)}
+                  key={c.id || c.name}
+                  onClick={() => bump("style", c.label || c.name)}
                   className={`group relative overflow-hidden rounded-2xl border bg-white/[.04] text-left ${
-                    state.style === label ? "ring-2 ring-pink-500" : "border-white/10 hover:border-white/20"
+                    state.style === (c.label || c.name) ? "ring-2 ring-pink-500" : "border-white/10 hover:border-white/20"
                   }`}
                 >
-                  <div className="h-56 w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.18),rgba(255,255,255,0)_70%)]" />
+                  <div className="h-56 w-full">
+                    {c.url ? (
+                      <img src={c.url} alt={c.name || c.label} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.18),rgba(255,255,255,0)_70%)]" />
+                    )}
+                  </div>
                   <div className="absolute inset-0 bg-black/30" />
                   <div className="absolute left-3 right-3 bottom-3 p-0">
                     <div className="px-3 pb-2">
-                      <h3 className="text-sm font-semibold text-white drop-shadow-md">{label}</h3>
+                      <h3 className="text-sm font-semibold text-white drop-shadow-md">{c.label || c.name}</h3>
                     </div>
                   </div>
                 </button>
@@ -384,13 +442,13 @@ export default function CreateCharacter() {
         {step === 2 && (
           <StepWrapper title="Choose Ethnicity, Age & Eye Color">
             <div className="grid grid-cols-3 gap-4 md:grid-cols-6">
-              {ethnicities.map((e) => (
+              {ethnicityItems.map((e) => (
                 <SelectCard
-                  key={e.id}
-                  label={e.label}
-                  selected={state.ethnicity === e.label}
-                  onClick={() => bump("ethnicity", e.label)}
-                  icon={"🌍"}
+                  key={e.id || e.name}
+                  label={e.label || e.name}
+                  selected={state.ethnicity === (e.label || e.name)}
+                  onClick={() => bump("ethnicity", e.label || e.name)}
+                  icon={e.url ? <img src={e.url} alt={e.name} className="h-16 w-16 object-cover rounded-md" /> : "🌍"}
                 />
               ))}
             </div>
@@ -463,11 +521,11 @@ export default function CreateCharacter() {
             <div className="mb-6 grid grid-cols-3 gap-4 md:grid-cols-6">
               {hairStyles.map((h) => (
                 <SelectCard
-                  key={h.id}
-                  label={h.label}
-                  selected={state.hairStyle === h.id}
-                  onClick={() => bump("hairStyle", h.id)}
-                  icon={"💇"}
+                  key={h.id || h.name}
+                  label={h.label || h.name}
+                  selected={state.hairStyle === (h.id || h.name)}
+                  onClick={() => bump("hairStyle", h.id || h.name)}
+                  imgUrl={h.url}
                 />
               ))}
             </div>
@@ -494,7 +552,7 @@ export default function CreateCharacter() {
           <StepWrapper title="Body Type & Sizes">
             <div className="mb-6 grid grid-cols-3 gap-4 md:grid-cols-6">
               {bodies.map((b) => (
-                <SelectCard key={b.id} label={b.label} selected={state.body === b.id} onClick={() => bump("body", b.id)} icon={"🧍"} />
+                <SelectCard key={b.id || b.name} label={b.label || b.name} selected={state.body === (b.id || b.name)} onClick={() => bump("body", b.id || b.name)} imgUrl={b.url} />
               ))}
             </div>
 
@@ -503,7 +561,7 @@ export default function CreateCharacter() {
                 <h3 className="mb-3 text-sm text-white/70">Breast Size</h3>
                 <div className="mb-6 grid grid-cols-3 gap-4 md:grid-cols-6">
                   {breasts.map((b) => (
-                    <SelectCard key={b.id} label={b.label} selected={state.breast === b.id} onClick={() => bump("breast", b.id)} icon={"🎯"} />
+                    <SelectCard key={b.id || b.name} label={b.label || b.name} selected={state.breast === (b.id || b.name)} onClick={() => bump("breast", b.id || b.name)} imgUrl={b.url} />
                   ))}
                 </div>
               </>
@@ -610,21 +668,72 @@ export default function CreateCharacter() {
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div className="col-span-1">
                 <div className="overflow-hidden rounded-xl border bg-white/[.015] p-0">
-                  <div className="flex h-64 items-end bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.06),rgba(255,255,255,0)_70%)]" />
+                  {/* Style/Character preview - prefer character asset with matching label */}
+                  <div className="flex h-64 items-end">
+                    {(() => {
+                      const charItem = findItem(characterItems, state.style) || findItem(characterItems, state.style === 'Anime' ? 'Anime' : state.style);
+                      if (charItem && charItem.url) {
+                        return <img src={charItem.url} alt={charItem.name || charItem.label} className="h-full w-full object-cover" />;
+                      }
+                      return <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.06),rgba(255,255,255,0)_70%)]" />;
+                    })()}
+                  </div>
                   <div className="px-3 py-2 text-center text-white/80">{state.style || "No style selected"}</div>
                 </div>
               </div>
               <div className="col-span-2 grid grid-cols-2 gap-4">
-                <div className="rounded-md bg-white/[.03] p-4">Gender: {gender}</div>
+                <div className="rounded-md bg-white/[.03] p-4 flex items-center gap-3">
+                  <div className="w-12 h-12 rounded overflow-hidden bg-white/[.02]">
+                    {/* Ethnicity thumbnail */}
+                    {(() => {
+                      const eth = findItem(ethnicityItems, state.ethnicity);
+                      return eth && eth.url ? <img src={eth.url} alt={eth.name || eth.label} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/[.02]" />;
+                    })()}
+                  </div>
+                  <div>Gender: {gender}</div>
+                </div>
+
                 <div className="rounded-md bg-white/[.03] p-4">Relationship: {state.relationship || "N/A"}</div>
-                <div className="rounded-md bg-white/[.03] p-4">Ethnicity: {state.ethnicity || "N/A"}</div>
+
+                <div className="rounded-md bg-white/[.03] p-4 flex items-center gap-3">
+                  <div className="w-12 h-12 rounded overflow-hidden bg-white/[.02]">
+                    {/* Hair style thumbnail */}
+                    {(() => {
+                      const h = findItem(hairStyleItems, state.hairStyle);
+                      return h && h.url ? <img src={h.url} alt={h.name || h.label} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/[.02]" />;
+                    })()}
+                  </div>
+                  <div>Hair: {labelFor(hairStyles, state.hairStyle)} {state.hairColor ? `(${state.hairColor})` : ""}</div>
+                </div>
+
                 <div className="rounded-md bg-white/[.03] p-4">Age: {state.age}</div>
-                <div className="rounded-md bg-white/[.03] p-4">Eyes: {state.eye || "N/A"}</div>
-                <div className="rounded-md bg-white/[.03] p-4">Hair: {labelFor(hairStyles, state.hairStyle)} {state.hairColor ? `(${state.hairColor})` : ""}</div>
-                <div className="rounded-md bg-white/[.03] p-4">Body: {state.body || "N/A"}</div>
-                <div className="rounded-md bg-white/[.03] p-4">Body: {labelFor(bodies, state.body)}</div>
-                {isFemaleLike && <div className="rounded-md bg-white/[.03] p-4">Breast: {labelFor(breasts, state.breast)}</div>}
+
+                <div className="rounded-md bg-white/[.03] p-4 flex items-center gap-3">
+                  <div className="w-12 h-12 rounded overflow-hidden bg-white/[.02]">
+                    {/* Body thumbnail */}
+                    {(() => {
+                      const b = findItem(bodyTypeItems, state.body);
+                      return b && b.url ? <img src={b.url} alt={b.name || b.label} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/[.02]" />;
+                    })()}
+                  </div>
+                  <div>Body: {labelFor(bodies, state.body)}</div>
+                </div>
+
+                {isFemaleLike && (
+                  <div className="rounded-md bg-white/[.03] p-4 flex items-center gap-3">
+                    <div className="w-12 h-12 rounded overflow-hidden bg-white/[.02]">
+                      {/* Breast thumbnail */}
+                      {(() => {
+                        const br = findItem(breastSizeItems, state.breast);
+                        return br && br.url ? <img src={br.url} alt={br.name || br.label} className="w-full h-full object-cover" /> : <div className="w-full h-full bg-white/[.02]" />;
+                      })()}
+                    </div>
+                    <div>Breast: {labelFor(breasts, state.breast)}</div>
+                  </div>
+                )}
+
                 <div className="rounded-md bg-white/[.03] p-4">Butt: {labelFor(butts, state.butt)}</div>
+
                 <div className="rounded-md bg-white/[.03] p-4">Personality: {labelFor(personalities, state.personality)}</div>
                 <div className="rounded-md bg-white/[.03] p-4">Voice: {state.voice || "N/A"}</div>
                 <div className="rounded-md bg-white/[.03] p-4">Clothing: {state.clothing.join(", ") || "—"}</div>

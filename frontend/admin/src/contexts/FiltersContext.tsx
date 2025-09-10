@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { addDays, subDays } from 'date-fns'
+import { subDays } from 'date-fns'
 import type { DateRange } from 'react-day-picker'
 
 export type FilterInterval = 'daily' | 'weekly' | 'monthly' | 'quarterly'

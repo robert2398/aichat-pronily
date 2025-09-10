@@ -6,13 +6,13 @@ import { Users } from './pages/Users';
 import { AIModelControl } from './pages/AIModelControl';
 import { ContentModeration } from './pages/ContentModeration';
 // Subscriptions removed
-import { PricingManagement } from './pages/PricingManagement';
+import PricingManagement from './pages/PricingManagement';
 import { Analytics } from './pages/Analytics';
 import { Characters } from './pages/Characters';
 import { Messaging } from './pages/Messaging';
 import { Support } from './pages/Support';
 import { Settings } from './pages/Settings';
-import { PromoManagement } from './pages/PromoManagement';
+import PromoManagement from './pages/PromoManagement';
 import OrderHistory from './pages/OrderHistory';
 import CoinTransactions from './pages/CoinTransactions';
 import { PushNotification } from './pages/PushNotification';
