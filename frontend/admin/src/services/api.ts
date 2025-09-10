@@ -969,7 +969,7 @@ class APIService {
     startDate: string;
     endDate: string;
     metric: 'active_count' | 'new_subscriptions' | 'cancellations';
-    interval: 'monthly' | 'quarterly';
+    interval: 'daily' | 'weekly' | 'monthly' | 'quarterly';
   }): Promise<{ metric: string; interval: string; history: { period: string; value: number }[] }> {
     const endpoints = [
       '/admin/dashboard/subscriptions/history',

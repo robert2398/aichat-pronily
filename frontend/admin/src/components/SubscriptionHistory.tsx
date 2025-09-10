@@ -19,12 +19,16 @@ const METRICS: { key: Metric; label: string; chart: 'area' | 'bar'; color: strin
 ];
 
 type Metric = 'active_count' | 'new_subscriptions' | 'cancellations';
-type IntervalOpt = 'monthly' | 'quarterly';
+type IntervalOpt = 'daily' | 'weekly' | 'monthly' | 'quarterly';
 
 export const SubscriptionHistory: React.FC<{ className?: string }> = ({ className }) => {
   const { filters } = useFilters();
   const [metric, setMetric] = useState<Metric>('active_count');
-  const [interval, setInterval] = useState<IntervalOpt>('monthly');
+  // default to global filter interval and keep in sync so global FilterBar controls payload
+  const [interval, setInterval] = useState<IntervalOpt>(filters.interval as IntervalOpt);
+
+  // When global filter interval changes, update local interval so API payload reflects global selection
+  useEffect(() => { setInterval(filters.interval as IntervalOpt); }, [filters.interval]);
 
   const startDate = filters.fromISO;
   const endDate = filters.toISO;
@@ -124,15 +128,16 @@ export const SubscriptionHistory: React.FC<{ className?: string }> = ({ classNam
           })}
         </div>
         <div className="flex items-center gap-2">
-          {(['monthly','quarterly'] as IntervalOpt[]).map(opt => {
+          {(['daily','weekly','monthly','quarterly'] as IntervalOpt[]).map(opt => {
             const active = interval === opt;
+            const label = opt === 'daily' ? 'Daily' : opt === 'weekly' ? 'Weekly' : opt === 'monthly' ? 'Monthly' : 'Quarterly';
             return (
               <button
                 key={opt}
                 type="button"
                 onClick={() => setInterval(opt)}
                 className={cn('px-3 py-1.5 text-xs font-medium rounded-md border transition', active ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50')}
-              >{opt === 'monthly' ? 'Monthly' : 'Quarterly'}</button>
+              >{label}</button>
             );
           })}
           <Button size="sm" variant="outline" onClick={() => query.refetch()} disabled={query.isFetching} className="ml-1">

@@ -84,8 +84,8 @@ export default function Dashboard() {
       })
       // Prefetch subscription history for default metric/interval
       queryClient.prefetchQuery({
-        queryKey: ['subscription-history', startDate, endDate, 'active_count', 'monthly'],
-        queryFn: () => apiService.getSubscriptionHistory({ startDate, endDate, metric: 'active_count', interval: 'monthly' })
+        queryKey: ['subscription-history', startDate, endDate, 'active_count', filters.interval || 'monthly'],
+        queryFn: () => apiService.getSubscriptionHistory({ startDate, endDate, metric: 'active_count', interval: filters.interval || 'monthly' })
       })
       // Dispatch internal events so child components can explicitly refetch with their current local state
       window.dispatchEvent(new CustomEvent('dashboard:subscriptions:refetch'))

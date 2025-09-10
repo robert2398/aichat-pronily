@@ -530,8 +530,8 @@ export default function CreateCharacter() {
                 <SelectCard
                   key={h.id || h.name}
                   label={h.label || h.name}
-                  selected={state.hairStyle === (h.id || h.name)}
-                  onClick={() => bump("hairStyle", h.id || h.name)}
+                  selected={state.hairStyle === (h.label || h.name)}
+                  onClick={() => bump("hairStyle", h.label || h.name)}
                   imgUrl={h.url}
                 />
               ))}
@@ -559,7 +559,7 @@ export default function CreateCharacter() {
           <StepWrapper title="Body Type & Sizes">
             <div className="mb-6 grid grid-cols-3 gap-4 md:grid-cols-6">
               {bodies.map((b) => (
-                <SelectCard key={b.id || b.name} label={b.label || b.name} selected={state.body === (b.id || b.name)} onClick={() => bump("body", b.id || b.name)} imgUrl={b.url} />
+                <SelectCard key={b.id || b.name} label={b.label || b.name} selected={state.body === (b.label || b.name)} onClick={() => bump("body", b.label || b.name)} imgUrl={b.url} />
               ))}
             </div>
 
@@ -568,7 +568,7 @@ export default function CreateCharacter() {
                 <h3 className="mb-3 text-sm text-white/70">Breast Size</h3>
                 <div className="mb-6 grid grid-cols-3 gap-4 md:grid-cols-6">
                   {breasts.map((b) => (
-                    <SelectCard key={b.id || b.name} label={b.label || b.name} selected={state.breast === (b.id || b.name)} onClick={() => bump("breast", b.id || b.name)} imgUrl={b.url} />
+                    <SelectCard key={b.id || b.name} label={b.label || b.name} selected={state.breast === (b.label || b.name)} onClick={() => bump("breast", b.label || b.name)} imgUrl={b.url} />
                   ))}
                 </div>
               </>
@@ -577,7 +577,7 @@ export default function CreateCharacter() {
             <h3 className="mb-3 text-sm text-white/70">Butt Size</h3>
             <div className="grid grid-cols-3 gap-4 md:grid-cols-6">
               {butts.map((b) => (
-                <SelectCard key={b.id} label={b.label} selected={state.butt === b.id} onClick={() => bump("butt", b.id)} icon={"🍑"} />
+                <SelectCard key={b.id} label={b.label} selected={state.butt === (b.label || b.id)} onClick={() => bump("butt", b.label || b.id)} icon={"🍑"} />
               ))}
             </div>
           </StepWrapper>

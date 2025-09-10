@@ -6,7 +6,7 @@ from sqlalchemy import func, select, cast, Date, text, case
 
 from app.api.v1.deps import get_db, require_admin
 from app.models.subscription import (
-    CoinTransaction, CoinPurchase, Subscription, Order, PromoManagement
+    CoinTransaction, CoinPurchase, Subscription, Order, PromoManagement, PricingPlan
 )
 from app.models.user import User
 from app.models.character import Character
@@ -162,16 +162,59 @@ async def subscriptions_plan_summary(
     rows = await db.execute(q)
     plans = []
     total_active = 0
+    # parse as_of_date into a datetime for window calculations
+    as_of_dt = _parse_datetime(as_of_date)
+    window_end = as_of_dt or datetime.utcnow()
+    window_start = window_end - timedelta(days=30)
+
     for plan_name, active_count in rows:
+        active_i = int(active_count or 0)
+
+        # monthly price: prefer PricingPlan.price by plan_name
+        monthly_price = None
+        if plan_name is not None:
+            price_row = await db.execute(select(PricingPlan.price).where(PricingPlan.plan_name == plan_name).limit(1))
+            price_val = price_row.scalar()
+            if price_val is not None:
+                try:
+                    monthly_price = float(price_val)
+                except Exception:
+                    monthly_price = None
+
+        # churn in the last 30 days ending at window_end
+        churn_q = select(func.count(Subscription.id)).where(
+            Subscription.plan_name == plan_name,
+            Subscription.status == 'canceled',
+            Subscription.current_period_end != None,
+            Subscription.current_period_end >= window_start,
+            Subscription.current_period_end <= window_end,
+        )
+        churn_count = int((await db.execute(churn_q)).scalar() or 0)
+
+        denom = active_i + churn_count
+        churn_rate = round((churn_count / denom * 100), 2) if denom > 0 else 0.0
+        retention_rate = round((100.0 - churn_rate), 2) if denom > 0 else 0.0
+
+        # average subscription duration in months for this plan (use start_date -> current_period_end or window_end)
+        avg_epoch_q = select(func.avg(func.extract('epoch', func.coalesce(Subscription.current_period_end, window_end) - Subscription.start_date))).where(
+            Subscription.plan_name == plan_name,
+            Subscription.start_date != None,
+        )
+        avg_seconds = (await db.execute(avg_epoch_q)).scalar()
+        if avg_seconds:
+            avg_months = round(float(avg_seconds) / (3600.0 * 24.0 * 30.436875), 2)
+        else:
+            avg_months = 0.0
+
         plans.append({
             "plan_name": plan_name,
-            "monthly_price": None,
-            "active_subscribers": int(active_count or 0),
-            "retention_rate": None,
-            "churn_rate": None,
-            "avg_subscription_duration": None,
+            "monthly_price": round(monthly_price, 2) if monthly_price is not None else None,
+            "active_subscribers": active_i,
+            "retention_rate": retention_rate,
+            "churn_rate": churn_rate,
+            "avg_subscription_duration": avg_months,
         })
-        total_active += int(active_count or 0)
+        total_active += active_i
 
     highest_retention_plan = None
     if plans:
@@ -204,7 +247,7 @@ async def subscriptions_history(
         metric = "active_count"
 
     interval = (interval or "monthly").lower()
-    if interval not in {"monthly", "quarterly"}:
+    if interval not in {"daily", "weekly", "monthly", "quarterly"}:
         interval = "monthly"
 
     # ---- parse & default dates ----
@@ -232,18 +275,39 @@ async def subscriptions_history(
         q_month = ((d.month - 1) // 3) * 3 + 1
         return date(d.year, q_month, 1)
 
-    if interval == "monthly":
+    # support daily, weekly, monthly, quarterly
+    if interval == "daily":
+        # align to day boundaries
+        start_dt = start_dt
+        end_dt = end_dt
+        step_sql = "interval '1 day'"
+        label_sql = "to_char(p.period_start, 'YYYY-MM-DD')"
+        trunc_unit = "day"
+        period_add_sql = "interval '1 day'"
+    elif interval == "weekly":
+        # align to ISO week (period_start should be a date that represents week start)
+        # use generate_series stepping by 1 week and label with ISO week
+        # for alignment we keep start_dt as-is; label formatting uses ISO week
+        start_dt = start_dt
+        end_dt = end_dt
+        step_sql = "interval '1 week'"
+        label_sql = "to_char(p.period_start, 'IYYY-\"W\"IW')"
+        trunc_unit = "week"
+        period_add_sql = "interval '1 week'"
+    elif interval == "monthly":
         start_dt = _month_start(start_dt)
         end_dt = _month_start(end_dt)
         step_sql = "interval '1 month'"
         label_sql = "to_char(p.period_start, 'YYYY-MM')"
         trunc_unit = "month"
+        period_add_sql = "interval '1 month'"
     else:  # quarterly
         start_dt = _quarter_start(start_dt)
         end_dt = _quarter_start(end_dt)
         step_sql = "interval '3 month'"
         label_sql = "to_char(p.period_start, 'YYYY-\"Q\"Q')"
         trunc_unit = "quarter"
+        period_add_sql = "interval '3 month'"
 
     # ---- SQL templates (Postgres) ----
     # We build a periods CTE with period_start and next_period_start (boundary moment).
@@ -252,7 +316,7 @@ async def subscriptions_history(
             WITH periods AS (
                 SELECT gs::date AS period_start,
                              (date_trunc('{trunc_unit}', gs)::date
-                                + {"interval '1 month'" if interval == 'monthly' else "interval '3 month'"}) AS next_period_start
+                                + {period_add_sql}) AS next_period_start
                 FROM generate_series(cast(:start_date as date), cast(:end_date as date), {step_sql}) AS gs
             )
     """
@@ -374,9 +438,15 @@ async def revenue_trends(
       timestamp columns against varchar parameters.
     - Support daily/monthly interval period formatting.
     """
-    # choose period label based on interval
+    # choose period label based on interval (daily, weekly, monthly, quarterly)
     if interval == 'daily':
         period_expr = func.to_char(Order.applied_at, 'YYYY-MM-DD').label('period')
+    elif interval == 'weekly':
+        # ISO week label, e.g. 2025-W01
+        period_expr = func.to_char(Order.applied_at, 'IYYY-"W"IW').label('period')
+    elif interval == 'quarterly':
+        # Quarter label, e.g. 2025-Q1
+        period_expr = func.to_char(Order.applied_at, 'YYYY-"Q"Q').label('period')
     else:
         # default to monthly
         period_expr = func.to_char(Order.applied_at, 'YYYY-MM').label('period')

@@ -53,7 +53,7 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
     }
     setLoading(true);
     const characterName = saveName || saveUsername || "Unnamed";
-    const payload = {
+  const payload = {
       name: characterName,
       username: saveUsername || undefined,
       bio: saveBio || undefined,
@@ -62,13 +62,13 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
       ethnicity: character.ethnicity,
       age: character.age,
       eye_colour: character.eye,
-  // Pass the human-readable label/value for these appearance fields (not asset filenames).
-  // character.* may be an id, an object {id,label,name,url} or a plain label string.
-  hair_style: (character.hairStyle && (character.hairStyle.label || character.hairStyle.name)) || (typeof character.hairStyle === 'string' ? character.hairStyle : '') ,
-      hair_colour: character.hairColor,
-  body_type: (character.body && (character.body.label || character.body.name)) || (typeof character.body === 'string' ? character.body : ''),
-  breast_size: (character.breast && (character.breast.label || character.breast.name)) || (typeof character.breast === 'string' ? character.breast : ''),
-  butt_size: (character.butt && (character.butt.label || character.butt.name)) || (typeof character.butt === 'string' ? character.butt : ''),
+  // Prefer the already-computed label fields (set when the flow finished).
+  // Fallback to legacy shapes (object or string) if the label fields are absent.
+  hair_style: character.hair_style || ((character.hairStyle && (character.hairStyle.label || character.hairStyle.name)) || (typeof character.hairStyle === 'string' ? character.hairStyle : '')),
+    hair_colour: character.hairColor,
+  body_type: character.body_type || ((character.body && (character.body.label || character.body.name)) || (typeof character.body === 'string' ? character.body : '')),
+  breast_size: character.breast_size || ((character.breast && (character.breast.label || character.breast.name)) || (typeof character.breast === 'string' ? character.breast : '')),
+  butt_size: character.butt_size || ((character.butt && (character.butt.label || character.butt.name)) || (typeof character.butt === 'string' ? character.butt : '')),
       dick_size: gender === "male" ? character.dick_size || "" : "",
       personality: character.personality,
       voice_type: character.voice,
@@ -246,7 +246,7 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
       <div className="mx-auto max-w-2xl rounded-2xl border border-white/10 bg-white/[.02] p-8 relative">
         {animating && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-[#0f1021]/80 to-[#24243e]/80 backdrop-blur-sm rounded-2xl p-6">
-            <ImageGenerationLoader />
+            <ImageGenerationLoader step={animStep} />
           </div>
         )}
         <h2 className="mb-6 text-center font-semibold text-pink-400">Your AI {titleTarget} Setting</h2>
