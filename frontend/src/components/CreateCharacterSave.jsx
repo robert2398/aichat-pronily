@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import ImageGenerationLoader from './ai/ImageGenerationLoader';
 import InsufficientCoinsModal from './ui/InsufficientCoinsModal';
+import Modal from './ui/Modal';
 import { useLocation, useNavigate } from "react-router-dom";
 
 export default function CreateCharacterSave({ character: propsCharacter = null, gender: propsGender = null }) {
@@ -18,6 +19,7 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
   const [loading, setLoading] = useState(false);
   const [resuming, setResuming] = useState(false);
   const [showInsufficientCoinsModal, setShowInsufficientCoinsModal] = useState(false);
+  const [modal, setModal] = useState({ open: false, title: '', message: '' });
   // animation state for create-character progress visualization
   const [animStep, setAnimStep] = useState('parse');
   const [animTimer, setAnimTimer] = useState(null);
@@ -46,7 +48,7 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
   const saveCharacter = async () => {
   console.debug('CreateCharacterSave: saveCharacter called');
     if (!saveName && !saveUsername) {
-      alert("Please enter a name or username.");
+      setModal({ open: true, title: 'Missing name', message: 'Please enter a name or username.' });
       return;
     }
     setLoading(true);
@@ -60,11 +62,13 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
       ethnicity: character.ethnicity,
       age: character.age,
       eye_colour: character.eye,
-      hair_style: character.hairStyle,
+  // Pass the human-readable label/value for these appearance fields (not asset filenames).
+  // character.* may be an id, an object {id,label,name,url} or a plain label string.
+  hair_style: (character.hairStyle && (character.hairStyle.label || character.hairStyle.name)) || (typeof character.hairStyle === 'string' ? character.hairStyle : '') ,
       hair_colour: character.hairColor,
-      body_type: character.body,
-      breast_size: character.breast,
-      butt_size: character.butt,
+  body_type: (character.body && (character.body.label || character.body.name)) || (typeof character.body === 'string' ? character.body : ''),
+  breast_size: (character.breast && (character.breast.label || character.breast.name)) || (typeof character.breast === 'string' ? character.breast : ''),
+  butt_size: (character.butt && (character.butt.label || character.butt.name)) || (typeof character.butt === 'string' ? character.butt : ''),
       dick_size: gender === "male" ? character.dick_size || "" : "",
       personality: character.personality,
       voice_type: character.voice,
@@ -148,7 +152,7 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
       stopAnimProgression();
       setAnimating(false);
   console.debug('CreateCharacterSave: saveCharacter error', err);
-      alert("Failed to create character: " + (err.message || err));
+      setModal({ open: true, title: 'Save failed', message: (err && err.message) ? err.message : 'Failed to create character.' });
     } finally {
       setLoading(false);
     }
@@ -225,7 +229,9 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
   try { localStorage.removeItem('pronily:pending:create-character:form'); } catch (e) {}
   if (!cancelled) navigate('/my-ai', { state: { refresh: true } });
       } catch (err) {
-        // ignore — user can retry manually
+        // Show a friendly popup if resuming failed (user can retry manually)
+        console.debug('CreateCharacterSave: resume error', err);
+        setModal({ open: true, title: 'Resume failed', message: (err && err.message) ? err.message : 'Failed to complete pending character creation.' });
       } finally {
         setLoading(false);
         setResuming(false);
@@ -277,6 +283,10 @@ export default function CreateCharacterSave({ character: propsCharacter = null, 
           open={showInsufficientCoinsModal} 
           onClose={() => setShowInsufficientCoinsModal(false)} 
         />
+        {/* Standard project modal for errors/info */}
+        <Modal open={modal.open} title={modal.title} onClose={() => setModal({ open: false, title: '', message: '' })}>
+          {modal.message}
+        </Modal>
       </div>
     </main>
   );

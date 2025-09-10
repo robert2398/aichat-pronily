@@ -807,7 +807,7 @@ export default function AiChat() {
                   onClick={() => setSource('Default')}
                   className={`h-9 px-4 min-w-[7rem] text-sm rounded-full text-center font-medium flex items-center justify-center transition-colors ${source === 'Default' ? 'bg-pink-500 text-white shadow' : 'text-white/90 hover:bg-white/5'}`}
                 >
-                  Pornily AI
+                  Pronily AI
                 </button>
                 <button
                   type="button"

@@ -28,7 +28,7 @@ if env_path.exists():
 class Settings(BaseSettings):
     orm_mode: bool = True
     DEBUG: bool = True
-    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/aichat-pronily"
+    DATABASE_URL: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/pornily"
     #DATABASE_URL: str = "postgresql+asyncpg://postgres:Gj1sG7JHNvTbUON1rWtm@aichat-pronily.c7sw0kqsq1e1.eu-north-1.rds.amazonaws.com:5432/aichat_pronliy"
 
     OPENAI_API_KEY: str = ""

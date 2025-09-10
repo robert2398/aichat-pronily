@@ -141,29 +141,31 @@ async def start_chat(chat: ChatCreate, user=Depends(get_current_user),
         messages.append({"role": "assistant", "content": msg.ai_message})
     messages.append({"role": "user", "content": chat.user_query})
     token_count = await approximate_token_count(messages)
-    # data = {
-    #     "messages": messages,
-    #     "stream": False,
-    #     "username" : username
-    # }
-    DEFAULT_STOP = ["<think>", "</think>", "Reasoning:", "Analysis:", "[analysis]", "[/analysis]"]
     data = {
         "messages": messages,
-        "max_new_tokens": 1024,
-        "temperature": 1.5,
-        "top_p": 0.95,
-        "stop": DEFAULT_STOP,
+        "stream": False,
+        "username" : username
     }
     print('Sending request to chat API with payload : ', data)
-    # response = requests.post(chat_url, headers=headers, json=data)
-    # print(response.text)
-    # if response.status_code != 200:
-    #     raise HTTPException(status_code=502, detail="Chat API error")
-    # chat_output = response.json()['message']['content']
+    response = requests.post(chat_url, headers=headers, json=data)
+    print(response.text)
+    if response.status_code != 200:
+        raise HTTPException(status_code=502, detail="Chat API error")
+    chat_output = response.json()['message']['content']
 
-    response = requests.post(chat_url, json=data)
-    chat_output = response.json().get("response", "")
-    chat_output = clean_model_output(chat_output)
+
+    # DEFAULT_STOP = ["<think>", "</think>", "Reasoning:", "Analysis:", "[analysis]", "[/analysis]"]
+    # data = {
+    #     "messages": messages,
+    #     "max_new_tokens": 1024,
+    #     "temperature": 1.5,
+    #     "top_p": 0.95,
+    #     "stop": DEFAULT_STOP,
+    # }
+
+    # response = requests.post(chat_url, json=data)
+    # chat_output = response.json().get("response", "")
+    # chat_output = clean_model_output(chat_output)
 
     new_message = ChatMessage(
         session_id=chat.session_id,

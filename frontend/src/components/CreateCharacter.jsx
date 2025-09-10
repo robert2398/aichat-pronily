@@ -89,7 +89,14 @@ export default function CreateCharacter() {
   
   const characterItems = useMemo(() => {
     const imgs = getAssets(gender === 'male' ? 'male' : 'female', 'character')
-    if (imgs && imgs.length) return imgs
+    if (imgs && imgs.length) {
+      // normalize any legacy filename label like 'Real' to the human-friendly 'Realistic'
+      return imgs.map((it) => ({
+        ...it,
+        // prefer existing label property, fallback to name; map literal 'Real' (any case) -> 'Realistic'
+        label: ((String(it.label || it.name || '').toLowerCase() === 'real') ? 'Realistic' : (it.label || it.name)),
+      }))
+    }
     return ["Realistic", "Anime"].map((x, i) => ({ id: `char${i + 1}`, label: x }))
   }, [gender])
   
