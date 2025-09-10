@@ -9,11 +9,19 @@ export interface PurchasesSummaryResponse {
   breakdown?: PurchasesBreakdownRow[]
 }
 
-export interface UsageByFeatureRow { feature: string; coins_spent: number; percentage?: number }
+export interface UsageByFeatureRow {
+  feature: string
+  // may contain spent and/or credited depending on flow
+  coins_spent?: number
+  coins_credited?: number
+  // generic percentage (single-mode) if provided
+  percentage?: number
+}
 export interface UsageByFeatureResponse {
   start_date: string
   end_date: string
-  total_coins_spent: number
+  total_coins_spent?: number
+  total_coins_credited?: number
   by_feature: UsageByFeatureRow[]
 }
 
@@ -55,12 +63,13 @@ export const coinsApi = {
     return res.data
   },
 
-  async getUsageByFeature(params: { startDate: string; endDate: string; feature?: string }): Promise<UsageByFeatureResponse> {
+  async getUsageByFeature(params: { startDate: string; endDate: string; feature?: string; flow?: 'spent' | 'credited' | 'both' }): Promise<UsageByFeatureResponse> {
     const res = await coinsClient.get('/admin/dashboard/coins/usage-by-feature', {
       params: {
         start_date: params.startDate,
         end_date: params.endDate,
         ...(params.feature && params.feature !== 'all' ? { feature: params.feature } : {}),
+        ...(params.flow ? { flow: params.flow } : {}),
       },
     })
     return res.data

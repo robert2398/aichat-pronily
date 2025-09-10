@@ -100,48 +100,147 @@ async def coins_purchases_summary(
     return response
 
 
+# @router.get("/coins/usage-by-feature", dependencies=[Depends(require_admin)])
+# async def coins_usage_by_feature(
+#     start_date: Optional[str] = Query(None),
+#     end_date: Optional[str] = Query(None),
+#     feature: Optional[str] = Query(None),
+#     db: AsyncSession = Depends(get_db),
+# ):
+#     """Coins spent by feature."""
+#     # parse date strings into datetimes for DB comparison
+#     start_dt = _parse_datetime(start_date)
+#     end_dt = _parse_datetime(end_date)
+
+#     q = select(func.coalesce(func.sum(CoinTransaction.coins), 0)).label("total")
+#     # base total
+#     total_q = select(func.coalesce(func.sum(CoinTransaction.coins), 0).label("total_coins_spent"))
+#     if start_dt:
+#         total_q = total_q.where(CoinTransaction.created_at >= start_dt)
+#     if end_dt:
+#         total_q = total_q.where(CoinTransaction.created_at <= end_dt)
+#     if feature:
+#         total_q = total_q.where(CoinTransaction.source_type == feature)
+
+#     total_row = await db.execute(total_q)
+#     total_coins = int((total_row.scalar()) or 0)
+
+#     by_feature_q = select(CoinTransaction.source_type.label("feature"), func.coalesce(func.sum(CoinTransaction.coins), 0).label("coins_spent"))
+#     if start_dt:
+#         by_feature_q = by_feature_q.where(CoinTransaction.created_at >= start_dt)
+#     if end_dt:
+#         by_feature_q = by_feature_q.where(CoinTransaction.created_at <= end_dt)
+#     if feature:
+#         by_feature_q = by_feature_q.where(CoinTransaction.source_type == feature)
+#     by_feature_q = by_feature_q.group_by(CoinTransaction.source_type).order_by(func.sum(CoinTransaction.coins).desc())
+
+#     rows = await db.execute(by_feature_q)
+#     features = []
+#     for feat, coins in rows:
+#         coins_i = int(coins or 0)
+#         pct = round((coins_i / total_coins * 100), 2) if total_coins > 0 else 0.0
+#         features.append({"feature": feat, "coins_spent": coins_i, "percentage": pct})
+
+#     return {"start_date": start_date, "end_date": end_date, "total_coins_spent": total_coins, "by_feature": features}
+
 @router.get("/coins/usage-by-feature", dependencies=[Depends(require_admin)])
 async def coins_usage_by_feature(
     start_date: Optional[str] = Query(None),
     end_date: Optional[str] = Query(None),
     feature: Optional[str] = Query(None),
+    flow: Optional[str] = Query("spent"),  # 'spent' | 'credited' | 'both'
     db: AsyncSession = Depends(get_db),
 ):
-    """Coins spent by feature."""
-    # parse date strings into datetimes for DB comparison
+    """
+    Coins by feature, separated by flow (spent=debit, credited=credit).
+    Default: spent (usage).
+    """
+    ct = CoinTransaction
+
+    # parse dates (you already have _parse_datetime in your snippet)
     start_dt = _parse_datetime(start_date)
     end_dt = _parse_datetime(end_date)
 
-    q = select(func.coalesce(func.sum(CoinTransaction.coins), 0)).label("total")
-    # base total
-    total_q = select(func.coalesce(func.sum(CoinTransaction.coins), 0).label("total_coins_spent"))
-    if start_dt:
-        total_q = total_q.where(CoinTransaction.created_at >= start_dt)
-    if end_dt:
-        total_q = total_q.where(CoinTransaction.created_at <= end_dt)
-    if feature:
-        total_q = total_q.where(CoinTransaction.source_type == feature)
+    def base_where(q):
+        if start_dt:
+            q = q.where(ct.created_at >= start_dt)
+        if end_dt:
+            q = q.where(ct.created_at <= end_dt)
+        if feature:
+            q = q.where(ct.source_type == feature)
+        return q
 
-    total_row = await db.execute(total_q)
-    total_coins = int((total_row.scalar()) or 0)
+    # totals
+    total_spent_q = base_where(select(func.coalesce(func.sum(ct.coins), 0))).where(ct.transaction_type == 'debit')
+    total_credited_q = base_where(select(func.coalesce(func.sum(ct.coins), 0))).where(ct.transaction_type == 'credit')
 
-    by_feature_q = select(CoinTransaction.source_type.label("feature"), func.coalesce(func.sum(CoinTransaction.coins), 0).label("coins_spent"))
-    if start_dt:
-        by_feature_q = by_feature_q.where(CoinTransaction.created_at >= start_dt)
-    if end_dt:
-        by_feature_q = by_feature_q.where(CoinTransaction.created_at <= end_dt)
-    if feature:
-        by_feature_q = by_feature_q.where(CoinTransaction.source_type == feature)
-    by_feature_q = by_feature_q.group_by(CoinTransaction.source_type).order_by(func.sum(CoinTransaction.coins).desc())
+    total_spent = int((await db.execute(total_spent_q)).scalar() or 0)
+    total_credited = int((await db.execute(total_credited_q)).scalar() or 0)
 
-    rows = await db.execute(by_feature_q)
-    features = []
-    for feat, coins in rows:
-        coins_i = int(coins or 0)
-        pct = round((coins_i / total_coins * 100), 2) if total_coins > 0 else 0.0
-        features.append({"feature": feat, "coins_spent": coins_i, "percentage": pct})
+    # by feature helpers
+    async def by_feature(direction: str):
+        dir_filter = ct.transaction_type == ('debit' if direction == 'spent' else 'credit')
+        q = base_where(
+            select(
+                ct.source_type.label('feature'),
+                func.coalesce(func.sum(ct.coins), 0).label('coins'),
+                func.count(ct.id).label('transactions'),
+            ).where(dir_filter)
+        ).group_by(ct.source_type).order_by(func.sum(ct.coins).desc())
+        rows = await db.execute(q)
+        if direction == 'spent':
+            denom = total_spent or 1
+        else:
+            denom = total_credited or 1
+        out = []
+        for feat, coins, tx in rows:
+            c = int(coins or 0)
+            pct = round(c / denom * 100, 2) if denom else 0.0
+            out.append({"feature": feat, "coins": c, "transactions": int(tx), "share_pct": pct})
+        return out
 
-    return {"start_date": start_date, "end_date": end_date, "total_coins_spent": total_coins, "by_feature": features}
+    if flow == 'both':
+        by_spent = await by_feature('spent')
+        by_credited = await by_feature('credited')
+
+        # merge on feature to compute net (credited - spent)
+        index = {}
+        for row in by_spent:
+            index[row["feature"]] = {"feature": row["feature"], "spent": row["coins"], "credited": 0}
+        for row in by_credited:
+            d = index.setdefault(row["feature"], {"feature": row["feature"], "spent": 0, "credited": 0})
+            d["credited"] = row["coins"]
+
+        combined = []
+        for feat, vals in index.items():
+            net = vals["credited"] - vals["spent"]
+            # optional: separate shares for spent vs credited; net has no meaningful share
+            combined.append({
+                "feature": feat,
+                "spent": vals["spent"],
+                "credited": vals["credited"],
+                "net": net,
+            })
+
+        return {
+            "start_date": start_date, "end_date": end_date, "flow": "both",
+            "totals": {"spent": total_spent, "credited": total_credited, "net": total_credited - total_spent},
+            "by_feature": combined,
+        }
+
+    # single flow (default: spent)
+    direction = 'debit' if flow == 'spent' else 'credit'
+    items = await by_feature('spent' if flow == 'spent' else 'credited')
+    total = total_spent if flow == 'spent' else total_credited
+
+    return {
+        "start_date": start_date,
+        "end_date": end_date,
+        "flow": flow,
+        "total_coins": total,
+        "by_feature": items,  # [{feature, coins, transactions, share_pct}]
+    }
+
 
 
 @router.get("/subscriptions/plan-summary", dependencies=[Depends(require_admin)])
