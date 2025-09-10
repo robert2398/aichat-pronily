@@ -42,7 +42,9 @@ export const TopActiveUsersTable: React.FC = () => {
       total_actions: r.total_actions,
       total_coins_spent: r.total_coins_spent,
       avg_coins_per_action: r.avg_coins_per_action ?? (r.total_actions ? (r.total_coins_spent / r.total_actions) : 0),
-      most_used_feature: r.most_used_feature ?? '',
+  most_used_feature: r.most_used_feature ?? '',
+  most_spent_feature: r.most_spent_feature ?? '',
+  most_spent_feature_coins: r.most_spent_feature_coins ?? 0,
     }))
     const csv = toCSV(out)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -95,6 +97,8 @@ export const TopActiveUsersTable: React.FC = () => {
               <th className="px-3 py-2 text-right font-medium">Coins Spent</th>
               <th className="px-3 py-2 text-right font-medium">Avg Coins/Action</th>
               <th className="px-3 py-2 text-left font-medium">Most Used Feature</th>
+              <th className="px-3 py-2 text-left font-medium">Most Spent Feature</th>
+              <th className="px-3 py-2 text-right font-medium">Most Spent Coins</th>
             </tr>
           </thead>
           <tbody>
@@ -114,6 +118,16 @@ export const TopActiveUsersTable: React.FC = () => {
                     <span className="text-muted-foreground">—</span>
                   )}
                 </td>
+                <td className="px-3 py-1.5">
+                  {r.most_spent_feature ? (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-800">
+                      {r.most_spent_feature}
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </td>
+                <td className="px-3 py-1.5 text-right tabular-nums">{(r.most_spent_feature_coins ?? 0).toLocaleString()}</td>
               </tr>
             ))}
           </tbody>

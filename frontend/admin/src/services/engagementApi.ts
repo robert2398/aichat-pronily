@@ -22,6 +22,9 @@ export interface TopActiveUserRow {
   total_coins_spent: number
   avg_coins_per_action?: number
   most_used_feature?: string | null
+  // new: feature where user spent the most coins and the amount spent there
+  most_spent_feature?: string | null
+  most_spent_feature_coins?: number
   user_email?: string | null
 }
 export interface TopActiveUsersResponse {

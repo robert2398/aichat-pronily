@@ -726,7 +726,37 @@ async def users_top_active(
             if end_dt:
                 coins_q = coins_q.where(CoinTransaction.created_at <= end_dt)
             coins_val = int((await db.execute(coins_q)).scalar() or 0)
-            out.append({"user_id": int(uid), "total_actions": int(actions), "total_coins_spent": coins_val, "avg_coins_per_action": round(coins_val / int(actions) if actions else 0, 2)})
+            # determine most used feature for this user (by action count) within the same time window
+            feat_q = select(CoinTransaction.source_type, func.count(CoinTransaction.id).label('cnt')).where(CoinTransaction.user_id == uid)
+            if start_dt:
+                feat_q = feat_q.where(CoinTransaction.created_at >= start_dt)
+            if end_dt:
+                feat_q = feat_q.where(CoinTransaction.created_at <= end_dt)
+            feat_q = feat_q.group_by(CoinTransaction.source_type).order_by(func.count(CoinTransaction.id).desc()).limit(1)
+            feat_row = await db.execute(feat_q)
+            most_used = None
+            first = feat_row.first()
+            if first:
+                most_used = first[0]
+            # determine most spent feature (by coins) for this user within the same window
+            spent_feat_q = select(CoinTransaction.source_type, func.coalesce(func.sum(CoinTransaction.coins), 0).label('coins')).where(CoinTransaction.user_id == uid, CoinTransaction.transaction_type == 'debit')
+            if start_dt:
+                spent_feat_q = spent_feat_q.where(CoinTransaction.created_at >= start_dt)
+            if end_dt:
+                spent_feat_q = spent_feat_q.where(CoinTransaction.created_at <= end_dt)
+            spent_feat_q = spent_feat_q.group_by(CoinTransaction.source_type).order_by(func.sum(CoinTransaction.coins).desc()).limit(1)
+            spent_row = await db.execute(spent_feat_q)
+            most_spent_feature = None
+            most_spent_feature_coins = 0
+            sr = spent_row.first()
+            if sr:
+                most_spent_feature = sr[0]
+                try:
+                    most_spent_feature_coins = int(sr[1] or 0)
+                except Exception:
+                    most_spent_feature_coins = int(sr[1]) if sr[1] is not None else 0
+
+            out.append({"user_id": int(uid), "total_actions": int(actions), "total_coins_spent": coins_val, "avg_coins_per_action": round(coins_val / int(actions) if actions else 0, 2), "most_used_feature": most_used, "most_spent_feature": most_spent_feature, "most_spent_feature_coins": most_spent_feature_coins})
         return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_active_users": out}
 
     # default coins_spent
@@ -747,7 +777,38 @@ async def users_top_active(
         if end_dt:
             actions_q = actions_q.where(CoinTransaction.created_at <= end_dt)
         actions_val = int((await db.execute(actions_q)).scalar() or 0)
-        out.append({"user_id": int(uid), "total_actions": actions_val, "total_coins_spent": int(coins or 0), "avg_coins_per_action": round(int(coins or 0) / actions_val if actions_val else 0, 2)})
+        # determine most used feature for this user (by action count) within the same time window
+        feat_q = select(CoinTransaction.source_type, func.count(CoinTransaction.id).label('cnt')).where(CoinTransaction.user_id == uid)
+        if start_dt:
+            feat_q = feat_q.where(CoinTransaction.created_at >= start_dt)
+        if end_dt:
+            feat_q = feat_q.where(CoinTransaction.created_at <= end_dt)
+        feat_q = feat_q.group_by(CoinTransaction.source_type).order_by(func.count(CoinTransaction.id).desc()).limit(1)
+        feat_row = await db.execute(feat_q)
+        most_used = None
+        first = feat_row.first()
+        if first:
+            most_used = first[0]
+
+        # determine most spent feature (by coins) for this user within the same window
+        spent_feat_q = select(CoinTransaction.source_type, func.coalesce(func.sum(CoinTransaction.coins), 0).label('coins')).where(CoinTransaction.user_id == uid, CoinTransaction.transaction_type == 'debit')
+        if start_dt:
+            spent_feat_q = spent_feat_q.where(CoinTransaction.created_at >= start_dt)
+        if end_dt:
+            spent_feat_q = spent_feat_q.where(CoinTransaction.created_at <= end_dt)
+        spent_feat_q = spent_feat_q.group_by(CoinTransaction.source_type).order_by(func.sum(CoinTransaction.coins).desc()).limit(1)
+        spent_row = await db.execute(spent_feat_q)
+        most_spent_feature = None
+        most_spent_feature_coins = 0
+        sr = spent_row.first()
+        if sr:
+            most_spent_feature = sr[0]
+            try:
+                most_spent_feature_coins = int(sr[1] or 0)
+            except Exception:
+                most_spent_feature_coins = int(sr[1]) if sr[1] is not None else 0
+
+        out.append({"user_id": int(uid), "total_actions": actions_val, "total_coins_spent": int(coins or 0), "avg_coins_per_action": round(int(coins or 0) / actions_val if actions_val else 0, 2), "most_used_feature": most_used, "most_spent_feature": most_spent_feature, "most_spent_feature_coins": most_spent_feature_coins})
     return {"start_date": start_date, "end_date": end_date, "metric": metric, "top_active_users": out}
 
 
