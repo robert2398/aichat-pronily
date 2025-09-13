@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Dropdown from "../ui/Dropdown";
+import { getAssets } from '../../utils/assets'
 
 function BackgroundTile({ item, onSelect }) {
   return (
@@ -9,7 +10,7 @@ function BackgroundTile({ item, onSelect }) {
       onClick={() => onSelect(item)}
       className="relative w-full overflow-hidden rounded-xl border border-white/10 bg-white/[.02] shadow-sm text-left hover:border-white/20"
     >
-      {item.img ? <img src={item.img} alt={item.name} className="h-40 w-full object-cover" /> : <div className="h-40 w-full bg-white/[.02]" />}
+      {item.img ? <img src={item.img} alt={item.name} className="h-72 w-full object-cover" /> : <div className="h-5 w-full bg-white/[.02]" />}
       <div className="absolute inset-0 bg-black/25" />
       <div className="absolute left-3 right-3 bottom-3 p-0">
         <div className="px-3 pb-2">
@@ -25,20 +26,65 @@ export default function SelectBackground() {
 
   const [type, setType] = useState("");
   const [mood, setMood] = useState("");
+  const backgrounds = useMemo(() => {
+    try {
+      // First try canonical asset loader which may include nested files
+      const items = getAssets(null, 'background') || [];
+      if (items && items.length) {
+        const seen = new Set();
+        return items
+          .filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; })
+          .map((i) => {
+            const name = i.name || '';
+            const low = name.toLowerCase();
+            let t = 'indoor';
+            if (low.includes('park') || low.includes('city')) t = 'outdoor';
+            let m = 'neutral';
+            if (low.includes('penthouse') || low.includes('lux')) m = 'luxury';
+            if (low.includes('park')) m = 'calm';
+            if (low.includes('night') || low.includes('club')) m = 'party';
+            if (low.includes('sauna')) m = 'relax';
+            if (low.includes('hospital')) m = 'clinical';
+            if (low.includes('bath')) m = 'intimate';
+            return { id: i.id, name: i.name, img: i.url, type: t, mood: m };
+          });
+      }
 
-  const backgrounds = useMemo(
-    () => [
-      { id: "penthouse", name: "Penthouse", img: "", type: "indoor", mood: "luxury" },
-      { id: "park", name: "Public Park", img: "", type: "outdoor", mood: "calm" },
-      { id: "night", name: "Night Club", img: "", type: "indoor", mood: "party" },
-      { id: "sauna", name: "Sauna", img: "", type: "indoor", mood: "relax" },
-      { id: "hospital", name: "Hospital", img: "", type: "indoor", mood: "clinical" },
-      { id: "city", name: "City", img: "", type: "outdoor", mood: "urban" },
-      { id: "bathroom", name: "Bathroom", img: "", type: "indoor", mood: "intimate" },
-      { id: "studio", name: "Studio", img: "", type: "indoor", mood: "neutral" },
-    ],
-    []
-  );
+      // Fallback: directly import files from the background folder to ensure Vite resolves URLs correctly
+      const mods = import.meta.glob('../../assets/generate ai/background/*.{png,jpg,jpeg,svg}', { eager: true, query: '?url', import: 'default' });
+      const mapped = Object.entries(mods).map(([path, url]) => {
+        const parts = String(path).split(/[\/]+/g);
+        const filename = parts[parts.length - 1] || path;
+        const name = filename.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const low = name.toLowerCase();
+        let t = 'indoor';
+        if (low.includes('park') || low.includes('city')) t = 'outdoor';
+        let m = 'neutral';
+        if (low.includes('penthouse') || low.includes('lux')) m = 'luxury';
+        if (low.includes('park')) m = 'calm';
+        if (low.includes('night') || low.includes('club')) m = 'party';
+        if (low.includes('sauna')) m = 'relax';
+        if (low.includes('hospital')) m = 'clinical';
+        if (low.includes('bath')) m = 'intimate';
+        return { id: path, name, img: url, type: t, mood: m };
+      });
+      return mapped;
+    } catch (e) {
+      return [];
+    }
+  }, []);
+
+  // fallback: if asset loader returned nothing, use a small static list to avoid empty UI
+  const backgroundsWithFallback = backgrounds && backgrounds.length ? backgrounds : [
+    { id: 'penthouse', name: 'Penthouse', img: '', type: 'indoor', mood: 'luxury' },
+    { id: 'park', name: 'Public Park', img: '', type: 'outdoor', mood: 'calm' },
+    { id: 'night', name: 'Night Club', img: '', type: 'indoor', mood: 'party' },
+    { id: 'sauna', name: 'Sauna', img: '', type: 'indoor', mood: 'relax' },
+    { id: 'hospital', name: 'Hospital', img: '', type: 'indoor', mood: 'clinical' },
+    { id: 'city', name: 'City', img: '', type: 'outdoor', mood: 'urban' },
+    { id: 'bathroom', name: 'Bathroom', img: '', type: 'indoor', mood: 'intimate' },
+    { id: 'studio', name: 'Studio', img: '', type: 'indoor', mood: 'neutral' },
+  ];
 
   const onSelect = (bg) => {
     try {
@@ -106,11 +152,15 @@ export default function SelectBackground() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
         {filtered.length > 0 ? (
-          filtered.map((b) => <BackgroundTile key={b.id} item={b} onSelect={onSelect} />)
+          filtered.map((b) => (
+            <div key={b.id} className="w-full">
+              <BackgroundTile item={b} onSelect={onSelect} />
+            </div>
+          ))
         ) : (
-          <div className="col-span-2 md:col-span-3 lg:col-span-4 rounded-md border border-white/10 bg-white/[.02] p-6 text-center">
+          <div className="col-span-1 sm:col-span-2 md:col-span-3 rounded-md border border-white/10 bg-white/[.02] p-6 text-center">
             <p className="text-white/70">No backgrounds found for the selected filters.</p>
           </div>
         )}

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Dropdown from "../ui/Dropdown";
+import { getAssets } from '../../utils/assets'
 
 function OutfitTile({ item, onSelect }) {
   return (
@@ -27,20 +28,46 @@ function OutfitTile({ item, onSelect }) {
 export default function SelectOutfit() {
   const navigate = useNavigate();
   const [category, setCategory] = useState("");
+  // load outfits from assets/generate ai/{gender}/outfit
+  const outfits = useMemo(() => {
+    try {
+      // detect selected character gender from localStorage first (fallback to all)
+      const sel = (localStorage.getItem('pronily:selectedCharacter') || localStorage.getItem('pronily:filter:gender') || localStorage.getItem('pronily:filter:gender')) || '';
+      // stored character selection uses JSON for generator prefixes; try both image/video keys
+      let gender = '';
+      try {
+        const imgChar = JSON.parse(localStorage.getItem('pronily:image:selectedCharacter') || '{}');
+        const vidChar = JSON.parse(localStorage.getItem('pronily:video:selectedCharacter') || '{}');
+        const pick = imgChar && imgChar.gender ? imgChar : (vidChar && vidChar.gender ? vidChar : null);
+        if (pick && pick.gender) gender = pick.gender.toLowerCase();
+      } catch (e) {}
 
-  const outfits = useMemo(
-    () => [
-      { id: "devil", name: "Devil", img: "", category: "costume" },
-      { id: "gstring", name: "G-string", img: "", category: "lingerie" },
-      { id: "croptop", name: "Crop top", img: "", category: "casual" },
-      { id: "bra", name: "Bra", img: "", category: "lingerie" },
-      { id: "nanoskirt", name: "Nano Skirt", img: "", category: "casual" },
-      { id: "jeans", name: "Jeans", img: "", category: "casual" },
-      { id: "burlesque", name: "Burlesque", img: "", category: "costume" },
-      { id: "uniform", name: "Uniform", img: "", category: "costume" },
-    ],
-    []
-  );
+      if (!gender) {
+        // fallback: 'female'|'male'|'trans' or empty to load all
+        const raw = localStorage.getItem('pronily:filter:gender') || '';
+        gender = raw ? raw.toLowerCase() : '';
+      }
+
+      if (gender) {
+        // getAssets expects 'female'|'male'|'trans' and folder 'outfit'
+        const items = getAssets(gender, 'outfit') || [];
+        return items.map(i => ({ id: i.id, name: i.name, img: i.url, category: (i.name || '').toLowerCase() }));
+      }
+
+      // if no gender chosen, merge all outfits from female/male/trans
+      const female = getAssets('female', 'outfit') || [];
+      const male = getAssets('male', 'outfit') || [];
+      const trans = getAssets('trans', 'outfit') || [];
+      const merged = [...female, ...male, ...trans];
+      // dedupe by id
+      const seen = new Set();
+      return merged.filter(i => {
+        if (seen.has(i.id)) return false; seen.add(i.id); return true;
+      }).map(i => ({ id: i.id, name: i.name, img: i.url, category: (i.name || '').toLowerCase() }));
+    } catch (e) {
+      return [];
+    }
+  }, []);
 
   const onSelect = (outfit) => {
     try {

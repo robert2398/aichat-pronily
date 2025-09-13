@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import Dropdown from "../ui/Dropdown";
+import { getAssets } from '../../utils/assets'
 
 function PoseTile({ item, onSelect }) {
   return (
@@ -28,22 +29,31 @@ export default function SelectPose() {
   const navigate = useNavigate();
 
   const [category, setCategory] = useState("");
+  const poses = useMemo(() => {
+    try {
+      let gender = '';
+      try {
+        const imgChar = JSON.parse(localStorage.getItem('pronily:image:selectedCharacter') || '{}');
+        const vidChar = JSON.parse(localStorage.getItem('pronily:video:selectedCharacter') || '{}');
+        const pick = imgChar && imgChar.gender ? imgChar : (vidChar && vidChar.gender ? vidChar : null);
+        if (pick && pick.gender) gender = pick.gender.toLowerCase();
+      } catch (e) {}
 
-  const poses = useMemo(
-    () => [
-      { id: "ahego", name: "Ahego", img: "", category: "faces" },
-      { id: "deepthroat", name: "Deepthroat", img: "", category: "oral" },
-      { id: "cumshot", name: "Cumshot", img: "", category: "action" },
-      { id: "reverse", name: "Reverse cowgirl", img: "", category: "cowgirl" },
-      { id: "frontdoggy", name: "Front Doggy", img: "", category: "doggystyle" },
-      { id: "bounce", name: "Bounce Walk", img: "", category: "movement" },
-      { id: "boobbounce", name: "Boob bounce", img: "", category: "movement" },
-      { id: "cowgirl", name: "Cowgirl", img: "", category: "cowgirl" },
-      { id: "doggypov", name: "Doggy POV", img: "", category: "doggystyle" },
-      { id: "tittydrop", name: "Titty drop", img: "", category: "movement" },
-    ],
-    []
-  );
+      if (gender) {
+        const items = getAssets(gender, 'pose') || [];
+        return items.map(i => ({ id: i.id, name: i.name, img: i.url, category: (i.name || '').toLowerCase() }));
+      }
+
+      const female = getAssets('female', 'pose') || [];
+      const male = getAssets('male', 'pose') || [];
+      const trans = getAssets('trans', 'pose') || [];
+      const merged = [...female, ...male, ...trans];
+      const seen = new Set();
+      return merged.filter(i => { if (seen.has(i.id)) return false; seen.add(i.id); return true; }).map(i => ({ id: i.id, name: i.name, img: i.url, category: (i.name || '').toLowerCase() }));
+    } catch (e) {
+      return [];
+    }
+  }, []);
 
   const onSelect = (pose) => {
     try {
