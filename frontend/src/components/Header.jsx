@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Menu, X, Search } from "lucide-react";
 import Dropdown from "./ui/Dropdown";
-// using the header logo in /img/tripleminds_logo.jpg
+// using the header logo in /img/Pornily.png
 
 function IconGem({ className = 'w-4 h-4' }) {
   return (
@@ -302,7 +302,7 @@ export default function Header() {
             aria-label="Triple Minds home"
             onClick={(e) => { e.preventDefault(); navigate('/'); }}
           >
-            <img src="/img/tripleminds_logo.jpg" alt="Triple Minds" className="h-8 w-auto" />
+            <img src="/img/Pornily.png" alt="Triple Minds" className="h-8 w-auto" />
           </a>
           {/* Center: Nav (desktop) */}
           <nav className="hidden md:flex items-center gap-1" aria-label="Primary">
@@ -425,7 +425,7 @@ export default function Header() {
                   trigger={
                     <button className="flex items-center gap-3 focus:outline-none hover:opacity-90">
                       <img
-                        src={user?.avatar || "/img/tripleminds_logo.jpg"}
+                        src={user?.avatar || "/img/Pornily.png"}
                         alt={user?.full_name || "User"}
                         className="h-9 w-9 rounded-full object-cover"
                       />
@@ -557,7 +557,7 @@ export default function Header() {
                 <div className="mt-3 border-t border-white/5 pt-3">
                   <div className="flex items-center gap-3 px-1">
                     <div className="avatar">
-                        <img src={user?.avatar || '/img/tripleminds_logo.jpg'} alt={user?.full_name || 'avatar'} />
+                        <img src={user?.avatar || '/img/Pornily.png'} alt={user?.full_name || 'avatar'} />
                       </div>
                     <div className="flex-1">
                       <div className="text-sm font-semibold">{user?.full_name}</div>

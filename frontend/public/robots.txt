@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /
+# Added to prevent search engines indexing the development site
+# If you want certain crawlers allowed, modify the directives accordingly

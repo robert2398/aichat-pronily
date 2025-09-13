@@ -275,8 +275,8 @@ export default function Settings() {
             <div className="rounded-full w-40 h-40 overflow-hidden ring-2 ring-pink-400">
               <img
                 // prefer the freshly selected file preview, then the profile avatar (mapped from profile_image_url), then a local placeholder
-                src={selectedFile ? URL.createObjectURL(selectedFile) : (user.avatar || "/img/tripleminds_logo.jpg")}
-                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/img/tripleminds_logo.jpg'; }}
+                src={selectedFile ? URL.createObjectURL(selectedFile) : (user.avatar || "/img/Pornily.png")}
+                onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/img/Pornily.png'; }}
                 alt={user.full_name || "avatar"}
                 className="w-full h-full object-cover"
               />

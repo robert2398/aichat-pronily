@@ -14,7 +14,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
           <div>
         <a href="#home" className="inline-flex items-center gap-2" aria-label="Triple Minds home" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
-          <img src="/img/tripleminds_logo.jpg" alt="Triple Minds" className="h-8 w-auto" />
+          <img src="/img/Pornily.png" alt="Triple Minds" className="h-8 w-auto" />
             </a>
             <p className="mt-4 max-w-xs text-sm text-white/70">
               Lorem Ipsum is simply dummy text of the printing and typesetting industry.

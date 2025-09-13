@@ -101,7 +101,7 @@ export default function VideosSection() {
 
   return (
     <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-16">
-      <h3 className="text-center text-2xl sm:text-3xl font-semibold tracking-tight">Our AI Porn Videos</h3>
+      <h3 className="text-center text-2xl sm:text-3xl font-semibold tracking-tight">Our Best AI Porn Videos Collection - 1080p (Full HD) to 4K+ (Ultra HD)</h3>
       <div className="mt-6">
         {loading ? (
           <div className="text-center text-white/60">Loading…</div>

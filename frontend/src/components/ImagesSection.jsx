@@ -90,7 +90,7 @@ export default function ImagesSection() {
 
   return (
     <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pb-12">
-      <h3 className="text-center text-2xl sm:text-3xl font-semibold tracking-tight">Our AI Porn Images</h3>
+      <h3 className="text-center text-2xl sm:text-3xl font-semibold tracking-tight">Our Best AI Porn Images Collection - 72 PPI to 200+ DPI</h3>
       <div className="mt-6">
         {loading ? (
           <div className="text-center text-white/60">Loading…</div>

@@ -15,6 +15,7 @@ import Cancel from "./components/Cancel";
 import BuyGems from "./components/BuyGems";
 import StoryGenerator from "./components/StoryGenerator";
 import GameGenerator from "./components/GameGenerator";
+import Signature from "./components/Signature";
 import FaqSection from "./components/FaqSection";
 
 import Footer from "./components/Footer";
@@ -88,6 +89,7 @@ export default function App() {
               <PricingPlans />
               <StoryGenerator />
               <GameGenerator />
+              <Signature />
               <FaqSection />
             </>
           }

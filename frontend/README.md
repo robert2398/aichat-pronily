@@ -1,7 +1,7 @@
 # Pronily — Conversion‑Ready NSFW (18+) AI Landing Experience
 
 <p align="center">
-  <img src="/img/tripleminds_logo.jpg" alt="Triple Minds" width="296" />
+  <img src="/img/Pornily.png" alt="Triple Minds" width="296" />
 </p>
 
 > **For consenting adults only (18+)**. Pronily is a premium, persuasive landing experience crafted for NSFW/18+ AI products. It helps you explain your offer with confidence, build trust fast, and convert visitors into paying customers—while keeping compliance, consent, and safety front and center.
