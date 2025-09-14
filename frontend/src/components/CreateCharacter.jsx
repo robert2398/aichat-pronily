@@ -1,6 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { getAssets } from '../utils/assets'
 import { useNavigate } from "react-router-dom";
+// explicit canonical style images (Vite ?url imports)
+import realFemaleStyle from '../../assets/create character/real/real female/style/style.jpg?url'
+import realMaleStyle from '../../assets/create character/real/real male/style/style.jpg?url'
+import realTransStyle from '../../assets/create character/real/real trans/style/style.png?url'
+import animeFemaleStyle from '../../assets/create character/anime/anime female/style/style.jpg?url'
+import animeMaleStyle from '../../assets/create character/anime/anime male/style/style.jpg?url'
+import animeTransStyle from '../../assets/create character/anime/anime trans/style/style.png?url'
 import CreateCharacterSave from './CreateCharacterSave';
 
 export default function CreateCharacter() {
@@ -78,6 +85,27 @@ export default function CreateCharacter() {
         const ob = order[b.variant] ?? 2;
         return oa - ob;
       });
+
+      // canonical static fallback: if discovery didn't yield two explicit variant+url
+      // entries, prefer the explicit imports so we guarantee left=Realistic, right=Anime
+      const hasTwo = mapped.length === 2 && mapped.every(m => m.variant && m.url);
+      if (!hasTwo) {
+        const canonical = {
+          female: [
+            { id: 'real_female_style', label: 'Realistic', variant: 'Realistic', url: realFemaleStyle },
+            { id: 'anime_female_style', label: 'Anime', variant: 'Anime', url: animeFemaleStyle },
+          ],
+          male: [
+            { id: 'real_male_style', label: 'Realistic', variant: 'Realistic', url: realMaleStyle },
+            { id: 'anime_male_style', label: 'Anime', variant: 'Anime', url: animeMaleStyle },
+          ],
+          trans: [
+            { id: 'real_trans_style', label: 'Realistic', variant: 'Realistic', url: realTransStyle },
+            { id: 'anime_trans_style', label: 'Anime', variant: 'Anime', url: animeTransStyle },
+          ],
+        };
+        return canonical[gender === 'male' ? 'male' : gender === 'trans' ? 'trans' : 'female'];
+      }
 
       return mapped
     }
