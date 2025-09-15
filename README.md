@@ -51,6 +51,11 @@ SELECT setval('public.chat_messages_id_seq', (SELECT MAX(id) FROM chat_messages)
 
 ---
 
+## Issues
+- check subscription feature; checkout session is not redirecting to payment page
+- 
+
+
 ## 🛠 Notes
 - Ensure `pm2` is installed on the EC2 instance.
 - Make sure your `.pem` file path is correct before running `scp`.
