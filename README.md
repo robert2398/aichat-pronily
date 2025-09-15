@@ -46,8 +46,7 @@ scp -i "D:/Projects/aichat-pronily/backend/aichat-pem.pem" -r ubuntu@ec2-13-48-1
 ## 📥 Update auto increment id after loading dummy data from local db
 
 ```bash
-select max(id) from character_media;
-ALTER SEQUENCE public.character_media_id_seq RESTART WITH 100002;
+SELECT setval('public.chat_messages_id_seq', (SELECT MAX(id) FROM chat_messages) + 1);
 ```
 
 ---
