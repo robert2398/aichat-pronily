@@ -43,9 +43,18 @@ scp -i "D:/Projects/aichat-pronily/backend/aichat-pem.pem" -r "D:/Projects/aicha
 scp -i "D:/Projects/aichat-pronily/backend/aichat-pem.pem" -r ubuntu@ec2-13-48-108-119.eu-north-1.compute.amazonaws.com:/home/ubuntu/pornily/pronily/backend/.env "D:/Projects/aichat-pronily/backend/.env"
 ```
 
+## 📥 Update auto increment id after loading dummy data from local db
+
+```bash
+select max(id) from character_media;
+ALTER SEQUENCE public.character_media_id_seq RESTART WITH 100002;
+```
+
 ---
 
 ## 🛠 Notes
 - Ensure `pm2` is installed on the EC2 instance.
 - Make sure your `.pem` file path is correct before running `scp`.
 - Keep database credentials safe — avoid committing them to GitHub.
+
+
