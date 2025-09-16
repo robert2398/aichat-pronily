@@ -51,8 +51,14 @@ SELECT setval('public.chat_messages_id_seq', (SELECT MAX(id) FROM chat_messages)
 
 ---
 
-## Issues
+## Issues & pending Items
 - check subscription feature; checkout session is not redirecting to payment page
+- Remove emotions in chat like smiles softly, leans close etc. It should just normal chat
+- Headers scrolling issue in admin page. Headers should always be visible consistently while scrolling.
+- Implement lazy loading
+- Implement last 2 sections in admin dashboard(frontend & backend)
+- Implement character view page with like option and implement like counter.
+- Change /ai-porn page. It should have static content and image and video generation should redirect from this page. Need to check with saini g.
 - 
 
 
