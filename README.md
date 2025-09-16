@@ -59,7 +59,8 @@ SELECT setval('public.chat_messages_id_seq', (SELECT MAX(id) FROM chat_messages)
 - Implement last 2 sections in admin dashboard(frontend & backend)
 - Implement character view page with like option and implement like counter.
 - Change /ai-porn page. It should have static content and image and video generation should redirect from this page. Need to check with saini g.
-- 
+- Image to image
+- generate picture/video during chat
 
 
 ## 🛠 Notes
