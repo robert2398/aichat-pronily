@@ -6,7 +6,6 @@ import ImagesSection from "./components/ImagesSection";
 import VideosSection from "./components/VideosSection";
 import FeaturesGrid from "./components/FeaturesGrid";
 import FeatureShowcase from "./components/FeatureShowcase";
-import PricingPlans from "./components/PricingPlans";
 import Pricing from "./components/Pricing";
 import Verify from "./components/Verify";
 import VerifyConfirm from "./components/VerifyConfirm";
@@ -90,7 +89,11 @@ export default function App() {
                 <VideosSection />
                 <FeaturesGrid />
                 <FeatureShowcase />
-                <PricingPlans />
+                <Suspense fallback={<div className="py-8 text-center">Loading plans…</div>}>
+                  <section className="pt-8 pb-16" id="pricing">
+                    <Pricing />
+                  </section>
+                </Suspense>
                 <StoryGenerator />
                 <GameGenerator />
                 <Signature />
