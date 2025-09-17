@@ -36,6 +36,7 @@ class Character(Base):
     relationship_type = Column(String(255))
     clothing = Column(String(255))
     special_features = Column(Text)
+    privacy = Column(String(255))
     prompt = Column(Text, nullable=False)
     image_url_s3 = Column(Text)
     created_at = Column(DateTime(timezone=True), default=datetime.datetime.now(datetime.timezone.utc), nullable=False)
