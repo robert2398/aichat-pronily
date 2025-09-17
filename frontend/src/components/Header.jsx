@@ -299,10 +299,10 @@ export default function Header() {
           <a
             href="/"
             className="group inline-flex items-center gap-2"
-            aria-label="Triple Minds home"
+            aria-label="Pornily home"
             onClick={(e) => { e.preventDefault(); navigate('/'); }}
           >
-            <img src="/img/Pornily.png" alt="Triple Minds" className="h-8 w-auto" />
+            <img src="/img/Pornily.svg" alt="Pornily" className="h-13 sm:h-15 w-auto" />
           </a>
           {/* Center: Nav (desktop) */}
           <nav className="hidden md:flex items-center gap-1" aria-label="Primary">
@@ -311,8 +311,9 @@ export default function Header() {
                 key={item.label}
                 href={item.href}
                 className="rounded-xl px-3 py-2 text-sm/6 text-white/80 hover:text-white hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                onClick={() => {
-                  // navigate for internal app routes (starting with '/'), otherwise let anchors work
+                onClick={(e) => {
+                  // Prevent the default full-page navigation and use client-side router for internal links
+                  if (e && e.preventDefault) e.preventDefault();
                   if (item.href && item.href.startsWith("/")) {
                     navigate(item.href);
                   } else {
@@ -331,7 +332,8 @@ export default function Header() {
                 <a
                   href="/signin"
                   className="rounded-xl px-3 py-2 text-sm/6 text-white/80 ring-1 ring-inset ring-white/15 hover:bg-white/5 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                  onClick={() => {
+                  onClick={(e) => {
+                    if (e && e.preventDefault) e.preventDefault();
                     console.log("Sign in click (desktop)");
                     navigate('/signin',{state:{background:location}});
                   }}
@@ -341,7 +343,8 @@ export default function Header() {
                 <a
                   href="/signup"
                   className="rounded-xl px-3 py-2 text-sm font-medium text-[#0A011A] bg-gradient-to-r from-violet-300 via-fuchsia-200 to-sky-200 shadow-[0_0_0_1px_rgba(255,255,255,0.15)_inset] hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                  onClick={() => {
+                  onClick={(e) => {
+                    if (e && e.preventDefault) e.preventDefault();
                     navigate('/signup', { state: { background: location } });
                   }}
                 >
@@ -530,7 +533,7 @@ export default function Header() {
                 key={item.label}
                 href={item.href}
                 className="rounded-xl px-3 py-2 text-sm/6 text-white/90 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                onClick={() => { setOpen(false); if (item.href && item.href.startsWith("/")) navigate(item.href); }}
+                onClick={(e) => { if (e && e.preventDefault) e.preventDefault(); setOpen(false); if (item.href && item.href.startsWith("/")) navigate(item.href); }}
               >
                 {item.label}
               </a>
@@ -541,14 +544,14 @@ export default function Header() {
                   <a
                     href="/signin"
                     className="flex-1 rounded-xl px-3 py-2 text-center text-sm/6 text-white/90 ring-1 ring-inset ring-white/15 hover:bg-white/5 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                    onClick={() => { setOpen(false); navigate('/signin',{state:{background:location}}); }}
+                    onClick={(e) => { if (e && e.preventDefault) e.preventDefault(); setOpen(false); navigate('/signin',{state:{background:location}}); }}
                   >
                       Sign in
                   </a>
                   <a
                     href="/signup"
                     className="flex-1 rounded-xl px-3 py-2 text-center text-sm font-medium text-[#0A011A] bg-gradient-to-r from-violet-300 via-fuchsia-200 to-sky-200 hover:opacity-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                    onClick={() => { setOpen(false); navigate('/signup', { state: { background: location } }); }}
+                    onClick={(e) => { if (e && e.preventDefault) e.preventDefault(); setOpen(false); navigate('/signup', { state: { background: location } }); }}
                   >
                     Get started
                   </a>

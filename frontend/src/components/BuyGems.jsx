@@ -225,8 +225,15 @@ export default function BuyGems(){
 
                           // if backend returns a url to redirect to (Stripe checkout), use it
                           if (session && session.url) {
-                            window.location.href = session.url;
-                            return;
+                            // Open checkout in a new tab/window to avoid navigating SPA away
+                            try {
+                              window.open(session.url, '_blank', 'noopener');
+                              return;
+                            } catch (e) {
+                              // fallback to assigning href if window.open is blocked
+                              window.location.href = session.url;
+                              return;
+                            }
                           }
 
                           // if backend returned a session id (like { session_id: 'cs_...' }), use Stripe.js to redirect

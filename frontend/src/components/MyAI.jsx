@@ -15,7 +15,7 @@ function ChatCharacterCard({ item, onOpen, messageCount }) {
       >
         <div className="h-80 w-full overflow-hidden">
           {item.img ? (
-            <img src={item.img} alt={item.name} className="h-full w-full object-cover object-top" />
+            <img src={item.img} alt={item.name} className="h-full w-full object-cover object-top" loading="lazy" decoding="async" />
           ) : (
             <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />
           )}

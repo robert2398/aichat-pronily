@@ -544,7 +544,7 @@ export default function AiPornVideo() {
             >
               <div className="flex items-center gap-3">
                 {character && character.img ? (
-                  <img src={character.img} alt={character.name} className="h-9 w-9 rounded-lg object-cover" />
+                  <img src={character.img} alt={character.name} className="h-9 w-9 rounded-lg object-cover" loading="lazy" decoding="async" />
                 ) : (
                   <span className="grid h-9 w-9 place-items-center rounded-lg bg-white/10">
                     <IconUserPlus className="w-5 h-5" />
@@ -577,7 +577,7 @@ export default function AiPornVideo() {
                 onClick={() => navigate("/ai-porn/video/pose")}
               >
                 {pose && pose.img ? (
-                  <img src={pose.img} alt={pose.name} className="w-full h-24 rounded-md object-cover" />
+                  <img src={pose.img} alt={pose.name} className="w-full h-24 rounded-md object-cover" loading="lazy" decoding="async" />
                 ) : (
                   <div className="w-full h-24 rounded-md bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.06),rgba(255,255,255,0)_70%)] flex items-center justify-center">
                     <IconPose className="w-8 h-8 text-white/60" />
@@ -604,7 +604,7 @@ export default function AiPornVideo() {
                 onClick={() => navigate("/ai-porn/video/source")}
               >
                 {videoSrc && videoSrc.thumb ? (
-                  <img src={videoSrc.thumb} alt={videoSrc.name} className="w-full h-24 rounded-md object-cover" />
+                  <img src={videoSrc.thumb} alt={videoSrc.name} className="w-full h-24 rounded-md object-cover" loading="lazy" decoding="async" />
                 ) : (
                   <div className="w-full h-24 rounded-md bg-white/[.02] flex items-center justify-center">
                     <IconVideo className="w-8 h-8 text-white/60" />
@@ -812,7 +812,7 @@ export default function AiPornVideo() {
                           </div>
                         ) : (
                           <div className="w-full aspect-square">
-                            <img src={mediaUrl} alt={`gallery-${key}`} className="w-full h-full object-cover object-top" />
+                            <img src={mediaUrl} alt={`gallery-${key}`} className="w-full h-full object-cover object-top" loading="lazy" decoding="async" />
                           </div>
                         )}
                       </button>

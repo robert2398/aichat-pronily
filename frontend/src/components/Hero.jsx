@@ -1,7 +1,9 @@
 import { Image as ImageIcon, Video, MessageCircle, User, BookOpen, Gamepad2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-// import home images via Vite so we can use them as translucent backgrounds
-const HOME_IMAGES = import.meta.glob('../../assets/home/1st section/*.{png,jpg,jpeg,svg}', { eager: true, query: '?url', import: 'default' });
+// import home images via Vite as lazy imports so they don't bloat the initial bundle
+// We'll resolve URLs on-demand using the returned function which returns a promise
+// NOTE: Vite deprecated the `as: 'url'` option in favor of `query: '?url', import: 'default'`
+const HOME_IMAGES = import.meta.glob('../../assets/home/1st section/*.{png,jpg,jpeg,svg}', { query: '?url', import: 'default' });
 
 export default function Hero() {
   console.log("Hero render");
@@ -16,12 +18,12 @@ export default function Hero() {
     { title: "Interactive Game", icon: Gamepad2, href: "#game", soon: true },
   ];
 
-  // map filenames to urls (normalize keys by filename)
+  // map filenames to lazy resolver functions; we will resolve only when rendering
   const imageMap = {};
-  Object.entries(HOME_IMAGES).forEach(([p, url]) => {
+  Object.entries(HOME_IMAGES).forEach(([p, resolver]) => {
     const parts = String(p).split(/[\\/]+/g);
     const filename = parts[parts.length - 1] || p;
-    imageMap[filename.toLowerCase()] = url;
+    imageMap[filename.toLowerCase()] = resolver; // resolver returns a URL promise
   });
 
   return (
@@ -34,13 +36,23 @@ export default function Hero() {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((it) => {
             const lookup = `${it.title}.png`.toLowerCase();
-            const bg = imageMap[lookup] || null;
+            // resolve the image URL lazily; don't block render synchronously
+            let bg = null;
+            const resolver = imageMap[lookup];
+            if (resolver && typeof resolver === 'function') {
+              // kick off async resolution but don't await — set as inline style when ready
+              resolver().then((url) => {
+                const el = document.querySelector(`[data-hero-key="${it.title}"]`);
+                if (el) el.style.backgroundImage = `url(${url})`;
+              }).catch(() => {});
+            }
             return (
               <a
+                data-hero-key={it.title}
                 key={it.title}
                 href={it.href}
                 className="relative overflow-hidden rounded-2xl border border-white/10 p-6 sm:p-8 min-h-[170px] flex items-center justify-start shadow hover:border-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
-                style={bg ? { backgroundImage: `url(${bg})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
+                style={{ backgroundSize: 'cover', backgroundPosition: 'center' }}
                 onClick={(e) => {
                   console.log("Hero tile click", it.title, it.href);
                   if (!it.href) return;
@@ -52,7 +64,11 @@ export default function Hero() {
                   }
                   if (it.href.startsWith("http://") || it.href.startsWith("https://")) {
                     e.preventDefault();
-                    window.location.href = it.href;
+                    try {
+                      window.open(it.href, '_blank', 'noopener');
+                    } catch (e) {
+                      window.location.href = it.href;
+                    }
                     return;
                   }
                 }}

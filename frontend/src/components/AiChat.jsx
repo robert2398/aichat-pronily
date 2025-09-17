@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { PhoneCall, MoreVertical, Search, ChevronLeft, Send, ShieldCheck, Heart, MessageSquare } from "lucide-react";
 import InsufficientCoinsModal from "./ui/InsufficientCoinsModal";
+import ChatSkeleton from './ui/ChatSkeleton';
 import { useMessageCounts } from "../hooks/useMessageCounts";
 
 // prefer S3 image url, fall back to local img — keep a single source-of-truth
@@ -21,7 +22,7 @@ function ChatCharacterCard({ item, onOpen, messageCount }) {
       >
   <div className="h-80 w-full overflow-hidden">
           {item.img ? (
-            <img src={item.img} alt={item.name} className="h-full w-full object-cover object-top" />
+            <img src={item.img} alt={item.name} className="h-full w-full object-cover object-top" loading="lazy" decoding="async" />
           ) : (
             <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />
           )}
@@ -837,7 +838,9 @@ export default function AiChat() {
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             {loadingChars ? (
-              <div className="col-span-full text-center text-sm text-white/70">Loading characters...</div>
+              <div className="col-span-full">
+                <ChatSkeleton />
+              </div>
             ) : charsError ? (
               <div className="col-span-full text-center text-sm text-red-400">{charsError}</div>
             ) : characters.length === 0 ? (
@@ -903,7 +906,7 @@ export default function AiChat() {
                   }`}
                 >
                   <div className="h-12 w-12 rounded-full overflow-hidden">
-                    {(c.image_url_s3 || c.img) ? <img src={c.image_url_s3 || c.img} alt={c.name} className="h-full w-full object-cover object-top" /> : <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />}
+                    {(c.image_url_s3 || c.img) ? <img src={c.image_url_s3 || c.img} alt={c.name} className="h-full w-full object-cover object-top" loading="lazy" decoding="async" /> : <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />}
                   </div>
                   <div className="flex-1">
                     <div className="text-xs font-medium">{c.name}</div>
@@ -921,7 +924,7 @@ export default function AiChat() {
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-full overflow-hidden">
                   {(selectedSafe.image_url_s3 || selectedSafe.img) ? 
-                    <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={selectedSafe.name} className="h-full w-full object-cover object-top" /> : 
+                    <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={selectedSafe.name} className="h-full w-full object-cover object-top" loading="lazy" decoding="async" /> : 
                     <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />
                   }
                 </div>
@@ -990,7 +993,7 @@ export default function AiChat() {
                       {m.from !== 'me' && (
                         <div className="avatar" title={selectedSafe.name}>
                           {(selectedSafe.image_url_s3 || selectedSafe.img) ? (
-                            <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={selectedSafe.name} />
+                            <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={selectedSafe.name} loading="lazy" decoding="async" />
                           ) : (
                             <div className="avatar-initials">{(selectedSafe.name || 'AI').slice(0,2).toUpperCase()}</div>
                           )}
@@ -1016,7 +1019,7 @@ export default function AiChat() {
                 <div className="message-wrapper message-ai">
                   <div className="avatar">
                     {(selectedSafe.image_url_s3 || selectedSafe.img) ? (
-                      <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={selectedSafe.name} />
+                      <img src={selectedSafe.image_url_s3 || selectedSafe.img} alt={selectedSafe.name} loading="lazy" decoding="async" />
                     ) : (
                       <div className="avatar-initials">AI</div>
                     )}

@@ -21,7 +21,7 @@ export default function CharacterCard({ id, name, img, age, bio, desc, likes, me
       {/* image area (use img if available, otherwise a radial gradient placeholder) */}
       <div className="h-80 w-full overflow-hidden">
         {img ? (
-          <img src={img} alt={name} className="h-full w-full object-cover object-top" />
+          <img src={img} alt={name} className="h-full w-full object-cover object-top" loading="lazy" decoding="async" />
         ) : (
           <div className="h-full w-full bg-[radial-gradient(75%_60%_at_50%_30%,rgba(255,255,255,0.12),rgba(255,255,255,0)_70%)]" />
         )}

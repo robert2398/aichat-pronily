@@ -1,19 +1,34 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
+import useInView from '../../hooks/useInView';
+import Skeleton from '../ui/Skeleton';
 
 function Thumb({ item, onOpen, onDownload, isDownloading = false }) {
   const src = item.s3_path_gallery || item.s3_path || item.s3_url || item.media_url || item.image_s3_url || item.image_url_s3 || item.image_url || item.url || item.path || item.file || item.image || item.img || item.signed_url || item.signedUrl || (item.attributes && (item.attributes.s3_path_gallery || item.attributes.url || item.attributes.path || item.attributes.image_s3_url || item.attributes.image_url_s3 || item.attributes.s3_url || item.attributes.media_url || item.attributes.file || item.attributes.img));
   const isVideo = (item.mime_type || item.content_type || '').toString().startsWith('video') || (src && /\.(mp4|webm|ogg)$/i.test(src));
+  const [ref, inView] = useInView({ rootMargin: '200px' });
+  const [loaded, setLoaded] = useState(false);
+
+  // only set the actual src attr when in view to avoid loading off-screen images
+  const displayedSrc = inView ? src : null;
+
   return (
     <div className="rounded overflow-hidden bg-white/5 relative group">
-      <button type="button" onClick={() => onOpen(item)} className="w-full block">
+      <button type="button" onClick={() => onOpen(item)} className="w-full block" ref={ref}>
         <div className="w-full aspect-[4/5]">
+          {!inView && <Skeleton className="w-full h-full" />}
           {isVideo ? (
-            <video src={src} className="w-full h-full object-cover object-top" muted preload="metadata" />
+            inView ? (
+              <video src={displayedSrc} className="w-full h-full object-cover object-top" muted preload="metadata" onLoadedData={() => setLoaded(true)} />
+            ) : null
           ) : (
-            <img src={src} alt={item.id} className="w-full h-full object-cover object-top" />
+            inView ? (
+              <img src={displayedSrc} alt={item.id} className={`w-full h-full object-cover object-top ${loaded ? '' : 'opacity-0'}`} loading="lazy" onLoad={() => setLoaded(true)} />
+            ) : null
           )}
+          {/* show a subtle placeholder while loading or until the image/video loads */}
+          {inView && !loaded && <div className="absolute inset-0"><Skeleton className="w-full h-full" /></div>}
         </div>
       </button>
       <button

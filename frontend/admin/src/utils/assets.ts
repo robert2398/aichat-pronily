@@ -4,7 +4,7 @@
   Exports a small API to query assets by category (girl | men) and optional sub-folder.
 
   Notes:
-  - Uses `import.meta.glob` with `as: 'url'` and `eager: true` so modules are resolved to URL strings at build time.
+  - Uses `import.meta.glob` with `query: '?url'` and `eager: true` so modules are resolved to URL strings at build time.
   - Path used is relative to this file: '../../../assets' -> points to frontend/assets
 */
 

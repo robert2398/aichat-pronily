@@ -14,10 +14,10 @@ export default function Footer() {
         <div className="grid grid-cols-1 gap-10 md:grid-cols-4">
           <div>
         <a href="#home" className="inline-flex items-center gap-2" aria-label="Pornily home" onClick={(e) => { e.preventDefault(); navigate('/'); }}>
-          <img src="/img/Pornily.png" alt="Triple Minds" className="h-8 w-auto" />
+          <img src="/img/Pornily.svg" alt="Pornily" className="h-40 w-auto sm:h-42" />
             </a>
             <p className="mt-4 max-w-xs text-sm text-white/70">
-              Lorem Ipsum is simply dummy text of the printing and typesetting industry.
+              Pornily is the go-to porn ai generator that lets you create custom ai porn in 5 seconds.
             </p>
           </div>
           <div>
@@ -43,10 +43,10 @@ export default function Footer() {
           <div>
             <h5 className="text-lg font-semibold">Social Media</h5>
             <ul className="mt-4 space-y-3 text-sm text-white/80">
-              <SocialLink href="#" icon={Instagram} label="Triple Minds on Instagram" />
-              <SocialLink href="#" icon={Facebook} label="Triple Minds on Facebook" />
-              <SocialLink href="#" icon={Twitter} label="Triple Minds on Twitter" />
-              <SocialLink href="#" icon={Instagram} label="Triple Minds on Instagram" />
+              <SocialLink href="#" icon={Instagram} label="Pornily on Instagram" />
+              <SocialLink href="#" icon={Facebook} label="Pornily on Facebook" />
+              <SocialLink href="#" icon={Twitter} label="Pornily on Twitter" />
+              <SocialLink href="#" icon={Instagram} label="Pornily on Instagram" />
             </ul>
           </div>
         </div>
