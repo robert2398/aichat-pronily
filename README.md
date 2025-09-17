@@ -19,6 +19,7 @@ ZqZc6NVsp2u5flkNcIHm
 
 ### Start Backend (FastAPI)
 ```bash
+source venv/bin/activate
 pm2 start "uvicorn app.main:app --host 0.0.0.0 --port 8000" --name fastapi
 ```
 
