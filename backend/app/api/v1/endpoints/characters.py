@@ -120,6 +120,7 @@ async def create_character(
                         voice_type=character.voice_type,
                         relationship_type=character.relationship_type,
                         special_features=character.special_features,
+                        privacy = character.privacy,
                         prompt=prompt,
                         image_url_s3=s3_key)
 

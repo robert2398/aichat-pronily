@@ -25,6 +25,7 @@ class CharacterBase(BaseModel):
     relationship_type: Optional[str]
     clothing: Optional[str]
     special_features: Optional[str]
+    privacy : Optional[str]
     
 
 class CharacterCreate(CharacterBase):
