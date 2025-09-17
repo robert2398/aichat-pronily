@@ -110,6 +110,7 @@ class CoinTransaction(Base):
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     subscription_id = Column(String(100), ForeignKey("subscriptions.subscription_id"), nullable=True)
+    character_id = Column(Integer, ForeignKey("characters.id"), nullable=True)
     transaction_type = Column(String(50), nullable=False)  # e.g. 'debit', 'credit'
     coins = Column(Integer, nullable=False)
     source_type = Column(String(50), nullable=False)  # e.g. 'subscription', 'coin_purchase','chat', 'image', 'video', 'character'
