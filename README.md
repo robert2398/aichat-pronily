@@ -14,7 +14,7 @@ DATABASE_URL=postgresql+asyncpg://postgres:tripleMINDS1234*@aichat.c7sw0kqsq1e1.
 
 **Password:**
 ```
-ZqZc6NVsp2u5flkNcIHm
+tripleMINDS1234*
 ```
 
 ---
