@@ -17,6 +17,10 @@ DATABASE_URL=postgresql+asyncpg://postgres:tripleMINDS1234*@aichat.c7sw0kqsq1e1.
 tripleMINDS1234*
 ```
 
+## 🚀 Creating db backup using .sql to AWS RDS (PostgreSQL)
+```
+psql -h aichat.c7sw0kqsq1e1.eu-north-1.rds.amazonaws.com -p 5432 -U postgres -d pornily_dev -f pornily_new_backup.sql
+```
 ---
 
 ## ⚡ Running Backend and Frontend
