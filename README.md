@@ -28,12 +28,14 @@ psql -h aichat.c7sw0kqsq1e1.eu-north-1.rds.amazonaws.com -p 5432 -U postgres -d 
 ### Start Backend (FastAPI)
 ```bash
 source venv/bin/activate
-pm2 start "uvicorn app.main:app --host 0.0.0.0 --port 8000" --name fastapi
+pm2 start "uvicorn app.main:app --host 0.0.0.0 --port 8000" --name pornily-backend
 ```
 
 ### Start Frontend (Vite/React)
 ```bash
-pm2 start npm --name aichat-frontend -- run dev -- --host 0.0.0.0 --port 5173
+pm2 start npm --name pornily-frontend -- run dev -- --host 0.0.0.0 --port 6789
+npm run build
+pm2 start serve --name pornily-frontend -- -s dist -l 6789
 ```
 
 ---
