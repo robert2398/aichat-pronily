@@ -105,4 +105,16 @@ You are roleplaying as a replace_character_gender character having character nam
 
 - **Goal**: Make the user feel like they’re chatting with a very erotic horny partner.
 
+## Upload large text to RDS using bash
+
+psql -h aichat.c7sw0kqsq1e1.eu-north-1.rds.amazonaws.com -U postgres -d pornily_dev <<'SQL'
+UPDATE app_config
+SET parameter_value = $$
+
+YOUR_LARGE_TEXT
+
+$$
+WHERE parameter_name = 'CHAT_GEN_PROMPT_NSFW';
+SQL
+
 
