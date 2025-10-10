@@ -118,4 +118,6 @@ $$
 WHERE parameter_name = 'CHAT_GEN_PROMPT_NSFW';
 SQL
 
-
+## To do list while deployment :
+- Change data type for order id in coin_transactions from string to integer
+- prefill table for app_config and pricing_plan
