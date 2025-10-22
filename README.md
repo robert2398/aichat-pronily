@@ -37,6 +37,9 @@ pm2 start npm --name pornily-frontend -- run dev -- --host 0.0.0.0 --port 6789
 npm run build
 pm2 start serve --name pornily-frontend -- -s dist -l 6789
 ```
+```bash
+NODE_ENV=production pm2 start server/index.js --name pornily-frontend
+```
 
 ---
 
