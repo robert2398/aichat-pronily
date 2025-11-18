@@ -7,6 +7,9 @@ Use the following command to connect to the AWS RDS instance:
 ```bash
 psql -h aichat.c7sw0kqsq1e1.eu-north-1.rds.amazonaws.com -p 5432 -U postgres -d pornily_dev
 ```
+```bash
+psql -h localhost -p 5433 -U postgres -d hl -f honeylove_full_2025-11-18.sql
+```
 Database env
 ```
 DATABASE_URL=postgresql+asyncpg://postgres:tripleMINDS1234*@aichat.c7sw0kqsq1e1.eu-north-1.rds.amazonaws.com:5432/pornily_dev
