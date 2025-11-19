@@ -127,3 +127,13 @@ SQL
 ## To do list while deployment :
 - Change data type for order id in coin_transactions from string to integer
 - prefill table for app_config and pricing_plan
+
+
+## Issues and Notes for HL
+- Foreground for Character Card on Explore Homepage
+- Realistic/ Anime filter in Header of Homepage
+- Push Notifications
+- Content Moderation in Admin page
+- Compliance in text/image prompts
+- Timestamp aware response in chat
+- 
