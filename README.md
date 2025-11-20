@@ -131,9 +131,24 @@ SQL
 
 ## Issues and Notes for HL
 - Foreground for Character Card on Explore Homepage
-- Realistic/ Anime filter in Header of Homepage
+- Realistic/ Anime filter in Header of Homepage - Done
 - Push Notifications
-- Content Moderation in Admin page
-- Compliance in text/image prompts
-- Timestamp aware response in chat
+- Content Moderation in Admin page - Done
+- Compliance in text/image prompts - Done
+- Timestamp aware response in chat - 
+- Buy Token page in UI
+- Subscription page in UI
+- Payment Backend and integration with UI
+- Chat Page should scroll to last message
+- Image Generation Prompt Handling (Fixed Prompts)
+-
+
+ADMIN PAGE :
+- User Management - Done
+- Dashboard 
+- Character management
+- Order management
+- Transaction Management
+- Content Moderation
+- Settings and Configurations
 - 
