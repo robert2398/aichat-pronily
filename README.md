@@ -130,18 +130,18 @@ SQL
 
 
 ## Issues and Notes for HL
-- Foreground for Character Card on Explore Homepage
+- Foreground for Character Card on Explore Homepage - Done
 - Realistic/ Anime filter in Header of Homepage - Done
 - Push Notifications
 - Content Moderation in Admin page - Done
 - Compliance in text/image prompts - Done
-- Timestamp aware response in chat - 
+- Timestamp aware response in chat - Done
 - Buy Token page in UI
 - Subscription page in UI
-- Payment Backend and integration with UI
-- Chat Page should scroll to last message
+- Payment Backend and integration with UI - Pending
+- Chat Page should scroll to last message - Done
 - Image Generation Prompt Handling (Fixed Prompts)
--
+- Make bio mandatory in character creation - Done
 
 ADMIN PAGE :
 - User Management - Done
