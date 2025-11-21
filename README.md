@@ -145,7 +145,7 @@ SQL
 
 ADMIN PAGE :
 - User Management - Done
-- Dashboard - Pending
+- Dashboard with Geo (mandatory) - Pending
 - Character management - Done
 - Order management - Done
 - Transaction Management - Done
