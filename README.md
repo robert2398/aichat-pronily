@@ -132,7 +132,7 @@ SQL
 ## Issues and Notes for HL
 - Foreground for Character Card on Explore Homepage - Done
 - Realistic/ Anime filter in Header of Homepage - Done
-- Push Notifications - Pending
+- Push Notifications - Done
 - Content Moderation in Admin page - Done
 - Compliance in text/image prompts - Done
 - Timestamp aware response in chat - Done
