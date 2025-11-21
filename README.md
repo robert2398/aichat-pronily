@@ -128,7 +128,7 @@ SQL
 - Change data type for order id in coin_transactions from string to integer
 - prefill table for app_config and pricing_plan
 
-
+## IMake a list and tell me what all needs to be done
 ## Issues and Notes for HL
 - Foreground for Character Card on Explore Homepage - Done
 - Realistic/ Anime filter in Header of Homepage - Done
