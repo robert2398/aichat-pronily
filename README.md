@@ -14,7 +14,22 @@ Database env
 ```
 DATABASE_URL=postgresql+asyncpg://postgres:tripleMINDS1234*@aichat.c7sw0kqsq1e1.eu-north-1.rds.amazonaws.com:5432/pornily_dev
 ```
+```
+export PGPASSWORD='Gj1sG7JHNvTbUON1rWtm'
 
+pg_dump \
+  -h aichat-pronily.c7sw0kqsq1e1.eu-north-1.rds.amazonaws.com \
+  -p 5432 \
+  -U postgres \
+  -d honeylove \
+  -F p \
+  -b \
+  -v \
+  -f honeylove_full_$(date +%F).sql
+  
+psql -h aichat-pronily.c7sw0kqsq1e1.eu-north-1.rds.amazonaws.com -p 5432 -U postgres -d olecams -f honeylove_full_2025-11-28.sql
+
+```
 **Password:**
 ```
 tripleMINDS1234*
