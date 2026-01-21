@@ -1205,3 +1205,6 @@ async def seed():
 
         print("Seed completed.")
 
+if __name__ == "__main__":
+    asyncio.run(seed())
+
